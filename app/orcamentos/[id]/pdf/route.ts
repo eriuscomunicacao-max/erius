@@ -119,7 +119,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     y -= mm(9);
     const nomeItem = it.tipo === "etiqueta" ? (it.descricao ? `Adesivo ${it.descricao}` : "Adesivo") : (it.descricao ?? it.servico);
     drawText(nomeItem, colItem, y, { size: 9.5, font: bold, color: PRETO });
-    drawText(it.tamanho ? `${it.tamanho} cm` : "—", colTam, y, { size: 9.5, color: CINZA });
+    drawText(it.tamanho ? (it.tipo === "etiqueta" ? `${it.tamanho} cm` : it.tamanho) : "—", colTam, y, { size: 9.5, color: CINZA });
     drawText(`${it.quantidade} un`, colQtd, y, { size: 9.5, color: CINZA });
     drawText(brl(it.valor_unitario), colUni, y, { size: 9.5, color: CINZA, align: "right" });
     drawText(brl(it.valor_total), colVal, y, { size: 10, font: bold, color: PRETO, align: "right" });

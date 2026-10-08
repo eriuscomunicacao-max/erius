@@ -15,7 +15,9 @@ const itens = [
   { href: "/orcamentos", nome: "Orçamentos", I: IPedido },
   { href: "/faturamento", nome: "Faturamento e Lucro", I: IGrafico },
   { href: "/relatorio", nome: "Relatório Mensal", I: IRelatorio },
+  { href: "/produtos", nome: "Produtos e serviços", I: IEtiqueta },
   { href: "/materiais", nome: "Materiais", I: IEtiqueta },
+  { href: "/assinatura", nome: "Assinatura", I: ICarteira },
   { href: "/config", nome: "Configurações", I: IEngrenagem },
 ];
 

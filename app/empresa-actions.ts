@@ -100,3 +100,31 @@ export async function excluirMaterial(fd: FormData) {
   await run(db().from("materiais").delete().eq("id", String(fd.get("id"))));
   revalidatePath("/materiais");
 }
+
+/* ---------- Produtos e serviços ---------- */
+const UNID = ["un", "milheiro", "m²", "m", "hora", "serviço"];
+function dadosProduto(fd: FormData) {
+  const u = String(fd.get("unidade") ?? "un");
+  return {
+    nome: txt(fd.get("nome")) ?? "Produto",
+    categoria: txt(fd.get("categoria")) ?? "Outros",
+    unidade: UNID.includes(u) ? u : "un",
+    preco: num(fd.get("preco")),
+    descricao: txt(fd.get("descricao")),
+  };
+}
+
+export async function criarProduto(fd: FormData) {
+  await run(db().from("produtos").insert(dadosProduto(fd)));
+  revalidatePath("/produtos");
+}
+
+export async function atualizarProduto(fd: FormData) {
+  await run(db().from("produtos").update(dadosProduto(fd)).eq("id", String(fd.get("id"))));
+  revalidatePath("/produtos");
+}
+
+export async function excluirProduto(fd: FormData) {
+  await run(db().from("produtos").delete().eq("id", String(fd.get("id"))));
+  revalidatePath("/produtos");
+}

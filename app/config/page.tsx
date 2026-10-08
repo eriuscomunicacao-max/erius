@@ -3,13 +3,13 @@ import Excluir from "@/components/Excluir";
 import Enviar from "@/components/Enviar";
 import FormReset from "@/components/FormReset";
 import Calculadora from "@/components/Calculadora";
-import { carregar, carregarPrecos } from "@/lib/data";
+import { carregar, carregarPadroes } from "@/lib/data";
 import { carregarEnvelopes } from "@/lib/assessor";
 import { brl } from "@/lib/format";
 import { CATEGORIAS_GASTO } from "@/lib/constants";
 import { getEmpresa } from "@/lib/empresa";
 import { salvarEmpresa, enviarLogo, removerLogo } from "../empresa-actions";
-import { salvarConfig, criarFixa, alternarFixa, excluirFixa, salvarPreco, salvarAssessor, atualizarFixa } from "../actions";
+import { salvarConfig, criarFixa, alternarFixa, excluirFixa, salvarAssessor, atualizarFixa } from "../actions";
 import Editar, { Campo } from "@/components/Editar";
 import { paraCampo } from "@/lib/format";
 import { Valor } from "@/components/Privacidade";
@@ -17,17 +17,14 @@ import { Valor } from "@/components/Privacidade";
 export const dynamic = "force-dynamic";
 
 export default async function Config() {
-  const [b, precos, envelopes, emp] = await Promise.all([carregar(), carregarPrecos(), carregarEnvelopes(), getEmpresa()]);
+  const [b, envelopes, emp, padroes] = await Promise.all([carregar(), carregarEnvelopes(), getEmpresa(), carregarPadroes()]);
   const somaPct = (envelopes ?? []).reduce((t, e) => t + e.pct, 0);
   const c = b.config;
-  const tamanhos = [...new Set(precos.map((p) => p.tamanho))].sort((x, y) => parseFloat(x) - parseFloat(y));
-  const qtds = [...new Set(precos.map((p) => p.quantidade))].sort((x, y) => x - y);
-  const mapa = new Map(precos.map((p) => [`${p.tamanho}|${p.quantidade}`, p.preco]));
   const fmt = (v: number) => v.toFixed(2).replace(".", ",");
 
   return (
     <>
-      <Cabecalho titulo="Configurações" sub="Caixa, despesas fixas e preços" />
+      <Cabecalho titulo="Configurações" sub="Empresa, caixa, padrões do orçamento e despesas fixas" />
       <div className="space-y-4 p-4 lg:p-5">
         <section className="painel p-5">
           <h2 className="titulo mb-1">Sua empresa</h2>
@@ -71,12 +68,24 @@ export default async function Config() {
                 <input id="caixa_inicial" name="caixa_inicial" defaultValue={fmt(c.caixa_inicial)} inputMode="decimal" className="campo" />
               </div>
               <div>
-                <label className="rotulo" htmlFor="adicional_prioridade">Adicional 48h (R$)</label>
+                <label className="rotulo" htmlFor="adicional_prioridade">Adicional produção prioritária (R$)</label>
                 <input id="adicional_prioridade" name="adicional_prioridade" defaultValue={fmt(c.adicional_prioridade)} inputMode="decimal" className="campo" />
               </div>
               <div>
                 <label className="rotulo" htmlFor="markup_revenda">Markup revenda (%)</label>
                 <input id="markup_revenda" name="markup_revenda" defaultValue={fmt(c.markup_revenda)} inputMode="decimal" className="campo" />
+              </div>
+              <div>
+                <label className="rotulo" htmlFor="validade_dias">Validade do orçamento (dias)</label>
+                <input id="validade_dias" name="validade_dias" defaultValue={String(padroes.validade)} inputMode="numeric" className="campo" />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="rotulo" htmlFor="prazo_padrao">Prazo de produção padrão</label>
+                <input id="prazo_padrao" name="prazo_padrao" defaultValue={padroes.prazo} className="campo" />
+              </div>
+              <div className="sm:col-span-3">
+                <label className="rotulo" htmlFor="pagamento_padrao">Forma de pagamento padrão</label>
+                <input id="pagamento_padrao" name="pagamento_padrao" defaultValue={padroes.pagamento} className="campo" />
               </div>
               <div className="sm:col-span-3"><Enviar>Salvar configurações</Enviar></div>
             </form>
@@ -157,37 +166,10 @@ export default async function Config() {
         </section>
 
         <section className="painel p-5">
-          <h2 className="titulo mb-4">Calculadora de preço</h2>
-          <Calculadora precos={precos} markup={c.markup_revenda} />
+          <h2 className="titulo mb-4">Calculadora de revenda</h2>
+          <Calculadora markup={c.markup_revenda} />
         </section>
 
-        <section className="painel overflow-x-auto p-5">
-          <h2 className="titulo mb-1">Tabela de etiquetas</h2>
-          <p className="mb-3 text-xs text-mute">Preço total do lote por tamanho e quantidade.</p>
-          <table className="tabela min-w-[760px]">
-            <thead>
-              <tr><th>Qtd</th>{tamanhos.map((t) => <th key={t} className="text-right">{t} cm</th>)}</tr>
-            </thead>
-            <tbody>
-              {qtds.map((q) => (
-                <tr key={q}>
-                  <td className="text-mute">{q}</td>
-                  {tamanhos.map((t) => {
-                    const v = mapa.get(`${t}|${q}`);
-                    return <td key={t} className="text-right"><Valor>{v !== undefined ? brl(v) : "—"}</Valor></td>;
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <FormReset action={salvarPreco} className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <input name="tamanho" required placeholder="Tamanho (ex: 7x7)" className="campo" aria-label="Tamanho" />
-            <input name="quantidade" required inputMode="numeric" placeholder="Quantidade" className="campo" aria-label="Quantidade" />
-            <input name="preco" required inputMode="decimal" placeholder="Preço R$" className="campo" aria-label="Preço" />
-            <Enviar>Salvar preço</Enviar>
-          </FormReset>
-          <p className="mt-1.5 text-xs text-mute">Se o tamanho e a quantidade já existirem, o preço é atualizado.</p>
-        </section>
       </div>
     </>
   );

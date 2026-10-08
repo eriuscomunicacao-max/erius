@@ -2,26 +2,11 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { criarOrcamento, atualizarOrcamento } from "@/app/actions";
-import { precoSugerido, lerMedida, type PrecoTabela } from "@/lib/precos";
+import { totalItem, rotuloUnidade, type Produto } from "@/lib/produtos";
 import { SERVICOS } from "@/lib/constants";
 import { Valor } from "@/components/Privacidade";
 
 const brl = (v: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0);
-
-type Item = {
-  tipo: "etiqueta" | "manual";
-  servico: string;
-  tamanho: string | null;
-  quantidade: number;
-  descricao: string | null;
-  valor_unitario: number;
-  valor_total: number;
-  outra?: boolean;       // medida fora da tabela (ex: 5x3)
-  medidaTxt?: string;    // o que foi digitado na medida livre
-  sugerido?: number;     // preço total sugerido pela tabela
-  manualTxt?: string;    // preço total digitado por você (vazio = usa o sugerido)
-  qtdTxt?: string;
-};
 const parseBR = (s: string) => {
   let t = String(s ?? "").trim().replace(/[R$\s]/g, "");
   if (!t) return 0;
@@ -30,95 +15,106 @@ const parseBR = (s: string) => {
   return isFinite(x) ? x : 0;
 };
 const r2 = (v: number) => Math.round(v * 100) / 100;
-const CAIXA_ENVIO = 2; // R$ por pedido (caixa custa R$1,50 → sobra R$0,50)
+const txtBR = (v: number) => (v ? String(v).replace(".", ",") : "");
 
+// Um item do orçamento. produto_id = null → item avulso (digitado na hora)
+type Item = {
+  produto_id: string | null;
+  servico: string;
+  unidade: string;
+  descricao: string;      // nome do item (avulso) ou complemento (produto do catálogo)
+  nomeProduto: string;
+  tamanho: string | null; // preservado ao editar
+  qtdTxt: string;
+  precoTxt: string;
+  largTxt: string;
+  altTxt: string;
+  fixo?: number;          // total original (ao editar) até mexer em qtd/preço
+};
+
+type Padroes = { prazo: string; pagamento: string; validade: number; adicional: number };
 type Inicial = {
   id: string; cliente: string; data: string; validade_dias: number; prazo: string | null; pagamento: string | null;
   observacoes: string | null; bonificacao: string | null; producao_prioritaria: boolean;
-  itens: { tipo: "etiqueta" | "manual"; servico: string; tamanho: string | null; quantidade: number; descricao: string | null; valor_unitario: number; valor_total: number }[];
+  itens: { tipo: string; servico: string; tamanho: string | null; quantidade: number; descricao: string | null; valor_unitario: number; valor_total: number }[];
 };
 
-export default function NovoOrcamento({ precos, inicial }: { precos: PrecoTabela[]; inicial?: Inicial }) {
-  const tamanhos = [...new Set(precos.map((p) => p.tamanho))].sort((a, b) => parseFloat(a) - parseFloat(b));
+const itemAvulso = (): Item => ({
+  produto_id: null, servico: SERVICOS[0], unidade: "un", descricao: "", nomeProduto: "", tamanho: null,
+  qtdTxt: "1", precoTxt: "", largTxt: "", altTxt: "",
+});
+const itemDoProduto = (p: Produto): Item => ({
+  produto_id: p.id, servico: p.categoria, unidade: p.unidade, descricao: "", nomeProduto: p.nome, tamanho: null,
+  qtdTxt: p.unidade === "milheiro" ? "1000" : "1", precoTxt: txtBR(p.preco), largTxt: "", altTxt: "",
+});
+
+const qtdDe = (it: Item) => Math.max(0, parseBR(it.qtdTxt));
+const totalDe = (it: Item) =>
+  it.fixo ?? totalItem(it.unidade, parseBR(it.precoTxt), qtdDe(it), parseBR(it.largTxt), parseBR(it.altTxt));
+const nomeDe = (it: Item) =>
+  it.produto_id ? [it.nomeProduto, it.descricao.trim()].filter(Boolean).join(" · ") : it.descricao.trim();
+
+export default function NovoOrcamento({ produtos, padroes, inicial }: { produtos: Produto[]; padroes: Padroes; inicial?: Inicial }) {
   const router = useRouter();
   const editando = !!inicial;
   const [cliente, setCliente] = useState(inicial?.cliente ?? "");
   const [itens, setItens] = useState<Item[]>(() =>
-    (inicial?.itens ?? []).map((it) => {
-      if (it.tipo !== "etiqueta") return { ...it };
-      const tam = it.tamanho ?? "";
-      const outra = !tamanhos.includes(tam);
-      // mantém o preço que já estava no orçamento
-      return {
-        ...it, outra, medidaTxt: outra ? tam : "", qtdTxt: String(it.quantidade),
-        sugerido: tam ? r2(precoSugerido(precos, tam, it.quantidade)) : 0,
-        manualTxt: it.valor_total.toFixed(2).replace(".", ","),
-      };
-    })
+    (inicial?.itens ?? []).map((it) => ({
+      ...itemAvulso(),
+      servico: it.servico,
+      descricao: it.tipo === "etiqueta" ? `Etiqueta ${it.tamanho ?? ""} ${it.descricao ?? ""}`.trim() : it.descricao ?? "",
+      tamanho: it.tamanho,
+      qtdTxt: String(it.quantidade),
+      precoTxt: txtBR(r2(it.valor_total / (it.quantidade || 1))),
+      fixo: it.valor_total,
+    }))
   );
-  const [caixa, setCaixa] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
 
-  function addEtiqueta() {
-    const tamanho = tamanhos[0] ?? "5x5";
-    const quantidade = 100;
-    const sug = r2(precoSugerido(precos, tamanho, quantidade));
-    setItens((v) => [...v, {
-      tipo: "etiqueta", servico: "Etiquetas", tamanho, quantidade, descricao: null,
-      valor_unitario: quantidade ? sug / quantidade : 0, valor_total: sug,
-      outra: false, medidaTxt: "", sugerido: sug, manualTxt: "", qtdTxt: String(quantidade),
-    }]);
-  }
-  function addManual() {
-    setItens((v) => [...v, { tipo: "manual", servico: SERVICOS[0], tamanho: null, quantidade: 1, descricao: "", valor_unitario: 0, valor_total: 0 }]);
-  }
-  function remover(i: number) {
-    setItens((v) => v.filter((_, idx) => idx !== i));
-  }
-  function atualizar(i: number, patch: Partial<Item>) {
-    setItens((v) => {
-      const novo = [...v];
-      const it = { ...novo[i], ...patch };
-      if (it.tipo === "etiqueta") {
-        if (patch.qtdTxt !== undefined) it.quantidade = Math.max(0, Math.round(parseBR(patch.qtdTxt)));
-        if (it.outra) {
-          const med = lerMedida(it.medidaTxt ?? "");
-          it.tamanho = med ? med.texto : (it.medidaTxt ?? "").trim() || null;
-        }
-        it.sugerido = it.tamanho ? r2(precoSugerido(precos, it.tamanho, it.quantidade)) : 0;
-        const manual = (it.manualTxt ?? "").trim() ? parseBR(it.manualTxt!) : null;
-        it.valor_total = r2(manual ?? it.sugerido);
-        it.valor_unitario = it.quantidade ? it.valor_total / it.quantidade : 0;
-      } else if (it.tipo === "manual") {
-        it.valor_total = it.valor_unitario * (it.quantidade || 1);
-      }
-      novo[i] = it;
-      return novo;
-    });
+  const mudar = (i: number, patch: Partial<Item>) =>
+    setItens((v) =>
+      v.map((it, idx) => {
+        if (idx !== i) return it;
+        const novo = { ...it, ...patch };
+        if ("qtdTxt" in patch || "precoTxt" in patch || "largTxt" in patch || "altTxt" in patch) delete novo.fixo;
+        return novo;
+      })
+    );
+
+  function escolherProduto(i: number, id: string) {
+    const p = produtos.find((x) => x.id === id);
+    setItens((v) => v.map((it, idx) => (idx === i ? (p ? itemDoProduto(p) : { ...itemAvulso(), qtdTxt: it.qtdTxt }) : it)));
   }
 
-  const total = itens.reduce((s, i) => s + i.valor_total, 0) + (caixa ? CAIXA_ENVIO : 0);
+  const total = itens.reduce((s, i) => s + totalDe(i), 0);
 
   async function salvar() {
     if (!cliente.trim()) return setErro("Informe o cliente.");
     if (!itens.length) return setErro("Adicione ao menos um item.");
-    if (itens.some((i) => i.tipo === "etiqueta" && (!i.tamanho || !lerMedida(i.tamanho)))) return setErro("Informe a medida da etiqueta (ex: 5x3).");
-    if (itens.some((i) => i.tipo === "etiqueta" && !i.quantidade)) return setErro("Informe a quantidade da etiqueta.");
+    for (const it of itens) {
+      if (!nomeDe(it)) return setErro("Dê um nome/descrição para todos os itens.");
+      if (!qtdDe(it)) return setErro("Informe a quantidade de todos os itens.");
+      if (it.unidade === "m²" && (!parseBR(it.largTxt) || !parseBR(it.altTxt))) return setErro("Informe largura e altura (em metros) dos itens cobrados por m².");
+    }
     setErro("");
     setSalvando(true);
     const fd = new FormData(formRef.current!);
-    // Caixa de envio: não aparece como item; os R$2 são somados direto no valor do primeiro item (etiqueta, se houver)
-    const alvo = Math.max(0, itens.findIndex((i) => i.tipo === "etiqueta"));
-    const itensFinal: Item[] = caixa
-      ? itens.map((it, idx) => {
-          if (idx !== alvo) return it;
-          const vt = r2(it.valor_total + CAIXA_ENVIO);
-          return { ...it, valor_total: vt, valor_unitario: vt / (it.quantidade || 1) };
-        })
-      : itens;
-    fd.set("itens", JSON.stringify(itensFinal));
+    const payload = itens.map((it) => {
+      const vt = r2(totalDe(it));
+      const q = qtdDe(it);
+      return {
+        tipo: "manual" as const,
+        servico: it.servico,
+        tamanho: it.unidade === "m²" ? `${it.largTxt} x ${it.altTxt} m` : it.tamanho,
+        quantidade: Math.max(1, Math.round(q)),
+        descricao: nomeDe(it),
+        valor_unitario: q ? r2(vt / q) : vt,
+        valor_total: vt,
+      };
+    });
+    fd.set("itens", JSON.stringify(payload));
     try {
       if (editando) {
         fd.set("id", String(inicial!.id));
@@ -129,7 +125,6 @@ export default function NovoOrcamento({ precos, inicial }: { precos: PrecoTabela
       await criarOrcamento(fd);
       setCliente("");
       setItens([]);
-      setCaixa(false);
       formRef.current?.reset();
     } catch (e: any) {
       setErro(e.message ?? "Erro ao salvar.");
@@ -151,29 +146,25 @@ export default function NovoOrcamento({ precos, inicial }: { precos: PrecoTabela
         </div>
         <div>
           <label className="rotulo" htmlFor="validade_dias">Validade (dias)</label>
-          <input id="validade_dias" name="validade_dias" defaultValue={String(inicial?.validade_dias ?? 15)} inputMode="numeric" className="campo" />
+          <input id="validade_dias" name="validade_dias" defaultValue={String(inicial?.validade_dias ?? padroes.validade)} inputMode="numeric" className="campo" />
         </div>
         <div className="col-span-2">
           <label className="rotulo" htmlFor="prazo">Prazo de produção</label>
-          <input id="prazo" name="prazo" defaultValue={inicial ? inicial.prazo ?? "" : "5 dias úteis após aprovação da arte"} className="campo" />
+          <input id="prazo" name="prazo" defaultValue={inicial ? inicial.prazo ?? "" : padroes.prazo} className="campo" />
         </div>
         <div className="col-span-2">
           <label className="rotulo" htmlFor="pagamento">Forma de pagamento</label>
-          <input id="pagamento" name="pagamento" defaultValue={inicial ? inicial.pagamento ?? "" : "50% na aprovação e 50% na entrega | PIX"} className="campo" />
+          <input id="pagamento" name="pagamento" defaultValue={inicial ? inicial.pagamento ?? "" : padroes.pagamento} className="campo" />
         </div>
-        <label className="flex items-end gap-2 pb-2 text-sm">
-          <input type="checkbox" name="producao_prioritaria" defaultChecked={inicial ? inicial.producao_prioritaria : true} className="h-4 w-4 accent-ciano" />
-          Oferecer produção prioritária (48h)
-        </label>
+        {padroes.adicional > 0 && (
+          <label className="flex items-end gap-2 pb-2 text-sm">
+            <input type="checkbox" name="producao_prioritaria" defaultChecked={inicial ? inicial.producao_prioritaria : false} className="h-4 w-4 accent-ciano" />
+            <span>Oferecer produção prioritária (+<Valor>{brl(padroes.adicional)}</Valor>)</span>
+          </label>
+        )}
         <div className="col-span-2 md:col-span-2">
           <label className="rotulo" htmlFor="bonificacao">Bonificação (opcional)</label>
-          <input
-            id="bonificacao"
-            name="bonificacao"
-            defaultValue={inicial?.bonificacao ?? ""}
-            className="campo"
-            placeholder="Ex: serão enviadas algumas etiquetas a mais, sem alteração no valor"
-          />
+          <input id="bonificacao" name="bonificacao" defaultValue={inicial?.bonificacao ?? ""} className="campo" placeholder="Ex: brinde ou item extra, sem alteração no valor" />
         </div>
         <div className="col-span-2 md:col-span-4">
           <label className="rotulo" htmlFor="observacoes">Observações (opcional)</label>
@@ -184,123 +175,57 @@ export default function NovoOrcamento({ precos, inicial }: { precos: PrecoTabela
       <div className="rounded-lg border border-line">
         <div className="flex items-center justify-between border-b border-line p-3">
           <span className="text-sm font-semibold text-ink">Itens do orçamento</span>
-          <div className="flex gap-2">
-            <button type="button" onClick={addEtiqueta} className="botao2 py-1 text-xs">+ Etiqueta (tabela)</button>
-            <button type="button" onClick={addManual} className="botao2 py-1 text-xs">+ Item manual</button>
-          </div>
+          <button type="button" onClick={() => setItens((v) => [...v, itemAvulso()])} className="botao2 py-1 text-xs">+ Adicionar item</button>
         </div>
         {itens.length === 0 ? (
-          <p className="p-4 text-sm text-mute">Nenhum item ainda. Adicione etiquetas (preço automático) ou um item manual (preço digitado).</p>
+          <p className="p-4 text-sm text-mute">
+            Nenhum item ainda. Clique em &quot;Adicionar item&quot; e escolha um produto do seu catálogo{produtos.length === 0 && " (cadastre em Produtos e serviços)"} ou digite um item avulso.
+          </p>
         ) : (
           <ul className="divide-y divide-line">
             {itens.map((it, i) => (
-              <li key={i} className="grid grid-cols-2 gap-2 p-3 md:grid-cols-6">
-                {it.tipo === "etiqueta" ? (
+              <li key={i} className="grid grid-cols-2 gap-2 p-3 md:grid-cols-12">
+                <div className="col-span-2 md:col-span-4">
+                  <label className="rotulo">Produto / serviço</label>
+                  <select className="campo" value={it.produto_id ?? ""} onChange={(e) => escolherProduto(i, e.target.value)}>
+                    <option value="">Item avulso (digitar)</option>
+                    {produtos.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                  </select>
+                  {it.produto_id && <div className="mt-1 text-[11px] text-mute">Cobrado {rotuloUnidade(it.unidade)}</div>}
+                </div>
+                <div className="col-span-2 md:col-span-3">
+                  <label className="rotulo">{it.produto_id ? "Complemento (opcional)" : "Descrição do item"}</label>
+                  <input className="campo" value={it.descricao} onChange={(e) => mudar(i, { descricao: e.target.value })} placeholder={it.produto_id ? "Ex: fosco, 4x4 cores" : "O que é o item"} />
+                </div>
+                {it.unidade === "m²" && (
                   <>
-                    <div>
-                      <label className="rotulo">Medida</label>
-                      <select
-                        className="campo"
-                        value={it.outra ? "__outra" : it.tamanho ?? ""}
-                        onChange={(e) =>
-                          e.target.value === "__outra"
-                            ? atualizar(i, { outra: true, medidaTxt: "" })
-                            : atualizar(i, { outra: false, tamanho: e.target.value })
-                        }
-                      >
-                        {tamanhos.map((t) => <option key={t} value={t}>{t} cm</option>)}
-                        <option value="__outra">Outra medida…</option>
-                      </select>
-                      {it.outra && (
-                        <input
-                          className="campo mt-1.5"
-                          autoFocus
-                          value={it.medidaTxt ?? ""}
-                          onChange={(e) => atualizar(i, { medidaTxt: e.target.value })}
-                          placeholder="Ex: 5x3"
-                        />
-                      )}
+                    <div className="md:col-span-1">
+                      <label className="rotulo">Larg. (m)</label>
+                      <input className="campo" inputMode="decimal" value={it.largTxt} onChange={(e) => mudar(i, { largTxt: e.target.value })} placeholder="1,00" />
                     </div>
-                    <div>
-                      <label className="rotulo">Quantidade</label>
-                      <input className="campo" inputMode="numeric" value={it.qtdTxt ?? String(it.quantidade)} onChange={(e) => atualizar(i, { qtdTxt: e.target.value })} />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="rotulo">Descrição (opcional)</label>
-                      <input className="campo" value={it.descricao ?? ""} onChange={(e) => atualizar(i, { descricao: e.target.value })} placeholder="Ex: colorida, fosco" />
-                    </div>
-                    <div>
-                      <label className="rotulo">Seu preço total (R$)</label>
-                      <input
-                        className="campo"
-                        inputMode="decimal"
-                        value={it.manualTxt ?? ""}
-                        onChange={(e) => atualizar(i, { manualTxt: e.target.value })}
-                        placeholder={(it.sugerido ?? 0).toFixed(2).replace(".", ",")}
-                      />
-                      <div className="mt-1 text-[11px] text-mute">
-                        {it.sugerido ? (
-                          <>
-                            Sugerido{it.outra ? " (estimado pela área)" : ""}: <Valor>{brl(it.sugerido)}</Valor>
-                            {(it.manualTxt ?? "").trim() && (
-                              <button type="button" onClick={() => atualizar(i, { manualTxt: "" })} className="ml-1 text-ciano underline">usar</button>
-                            )}
-                          </>
-                        ) : it.outra ? "Digite a medida (ex: 5x3)" : "Sem preço na tabela"}
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div>
-                      <label className="rotulo">Serviço</label>
-                      <select className="campo" value={it.servico} onChange={(e) => atualizar(i, { servico: e.target.value })}>
-                        {SERVICOS.map((s) => <option key={s}>{s}</option>)}
-                      </select>
-                    </div>
-                    <div className="col-span-2">
-                      <label className="rotulo">Descrição</label>
-                      <input className="campo" value={it.descricao ?? ""} onChange={(e) => atualizar(i, { descricao: e.target.value })} placeholder="O que é o item" />
-                    </div>
-                    <div>
-                      <label className="rotulo">Quantidade</label>
-                      <input className="campo" inputMode="numeric" value={it.quantidade} onChange={(e) => atualizar(i, { quantidade: Number(e.target.value) || 1 })} />
-                    </div>
-                    <div>
-                      <label className="rotulo">Valor unitário (R$)</label>
-                      <input
-                        className="campo"
-                        inputMode="decimal"
-                        value={it.valor_unitario || ""}
-                        onChange={(e) => {
-                          const v = Number(e.target.value.replace(",", ".")) || 0;
-                          atualizar(i, { valor_unitario: v });
-                        }}
-                        placeholder="0,00"
-                      />
+                    <div className="md:col-span-1">
+                      <label className="rotulo">Alt. (m)</label>
+                      <input className="campo" inputMode="decimal" value={it.altTxt} onChange={(e) => mudar(i, { altTxt: e.target.value })} placeholder="2,00" />
                     </div>
                   </>
                 )}
-                <div className="flex items-end justify-between gap-2">
-                  <span className="font-display font-semibold text-ciano">
-                    <Valor>{brl(it.valor_total)}</Valor>
-                    {it.tipo === "etiqueta" && it.quantidade > 0 && (
-                      <span className="block text-[11px] font-normal text-mute"><Valor>{brl(it.valor_unitario)}</Valor>/un</span>
-                    )}
-                  </span>
-                  <button type="button" onClick={() => remover(i)} className="rounded p-1.5 text-mute hover:bg-magenta/15 hover:text-magenta" aria-label="Remover item">
+                <div className="md:col-span-1">
+                  <label className="rotulo">Qtd</label>
+                  <input className="campo" inputMode="decimal" value={it.qtdTxt} onChange={(e) => mudar(i, { qtdTxt: e.target.value })} />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="rotulo">Preço {it.unidade !== "un" ? `(${it.unidade})` : ""} (R$)</label>
+                  <input className="campo" inputMode="decimal" value={it.precoTxt} onChange={(e) => mudar(i, { precoTxt: e.target.value })} placeholder="0,00" />
+                </div>
+                <div className="col-span-2 flex items-end justify-between gap-2 md:col-span-1">
+                  <span className="pb-2 font-display font-semibold text-ciano"><Valor>{brl(totalDe(it))}</Valor></span>
+                  <button type="button" onClick={() => setItens((v) => v.filter((_, idx) => idx !== i))} className="rounded p-1.5 text-mute hover:bg-magenta/15 hover:text-magenta" aria-label="Remover item">
                     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" /></svg>
                   </button>
                 </div>
               </li>
             ))}
           </ul>
-        )}
-        {itens.length > 0 && !editando && (
-          <label className="flex items-center gap-2 border-t border-line p-3 text-sm">
-            <input type="checkbox" checked={caixa} onChange={(e) => setCaixa(e.target.checked)} className="h-4 w-4 accent-ciano" />
-            Enviar em caixa (+<Valor>{brl(CAIXA_ENVIO)}</Valor>, já somado no valor) — desmarcado = saquinho
-          </label>
         )}
         {itens.length > 0 && (
           <div className="flex items-center justify-between border-t border-line p-3">
@@ -310,7 +235,7 @@ export default function NovoOrcamento({ precos, inicial }: { precos: PrecoTabela
         )}
       </div>
 
-      {erro && <p className="text-sm text-magenta">{erro}</p>}
+      {erro && <p className="text-sm text-magenta" role="alert">{erro}</p>}
       <div className="flex gap-2">
         <button type="submit" disabled={salvando} className="botao disabled:opacity-60">
           {salvando ? "Salvando..." : editando ? "Salvar alterações" : "Salvar orçamento"}

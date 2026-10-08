@@ -1,13 +1,13 @@
 import Cabecalho from "@/components/Cabecalho";
 import NovoOrcamento from "@/components/NovoOrcamento";
-import { carregarOrcamentos, carregarPrecos } from "@/lib/data";
+import { carregarOrcamentos, carregarProdutos, carregarPadroes } from "@/lib/data";
 import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default async function EditarOrcamento({ params }: { params: { id: string } }) {
   const id = params.id;
-  const [orcs, precos] = await Promise.all([carregarOrcamentos(), carregarPrecos()]);
+  const [orcs, produtos, padroes] = await Promise.all([carregarOrcamentos(), carregarProdutos(), carregarPadroes()]);
   const o = orcs.find((x) => x.id === id);
   if (!o) notFound();
   return (
@@ -20,7 +20,7 @@ export default async function EditarOrcamento({ params }: { params: { id: string
               Este orçamento já virou OS. Alterar aqui não muda a OS: pra mudar o serviço, edite a OS.
             </p>
           )}
-          <NovoOrcamento precos={precos} inicial={o} />
+          <NovoOrcamento produtos={produtos} padroes={padroes} inicial={o} />
         </section>
       </div>
     </>

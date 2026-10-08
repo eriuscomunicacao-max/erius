@@ -5,6 +5,9 @@ import Sidebar from "@/components/Sidebar";
 import { PrivacidadeProvider } from "@/components/Privacidade";
 import { getEmpresaOuNull } from "@/lib/empresa";
 import { db } from "@/lib/supabase";
+import { getAssinatura } from "@/lib/assinatura";
+import { estadoDe, diasRestantes } from "@/lib/assinatura-regras";
+import BannerAssinatura from "@/components/BannerAssinatura";
 
 export const metadata: Metadata = {
   title: "OrçaGrafica",
@@ -18,6 +21,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     const { data } = await db().storage.from("logos").createSignedUrl(emp.logo_path, 3600);
     logoUrl = data?.signedUrl ?? null;
   }
+  const ass = emp ? await getAssinatura() : null;
+  const emTeste = ass && estadoDe(ass) === "trial";
   return (
     <html lang="pt-BR">
       <head>
@@ -35,7 +40,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <Suspense fallback={<div className="lg:w-[218px]" />}>
                 <Sidebar nome={emp.nome} logoUrl={logoUrl} />
               </Suspense>
-              <main className="min-w-0 flex-1">{children}</main>
+              <main className="min-w-0 flex-1">
+                {emTeste && <BannerAssinatura dias={diasRestantes(ass!.trial_ate)} />}
+                {children}
+              </main>
             </>
           ) : (
             children

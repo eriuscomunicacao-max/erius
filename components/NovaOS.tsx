@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { criarOS, atualizarOS } from "@/app/actions";
 import { SERVICOS, FORMAS } from "@/lib/constants";
+import type { Produto } from "@/lib/produtos";
 import { Valor } from "@/components/Privacidade";
 
 const brl = (v: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0);
@@ -27,7 +28,7 @@ type InicialOS = {
   itens: { servico: string; descricao: string; quantidade: number; valor_unitario: number; valor_total: number }[];
 };
 
-export default function NovaOS({ hoje, nomes, inicial, pagoAtual = 0 }: { hoje: string; nomes: string[]; inicial?: InicialOS; pagoAtual?: number }) {
+export default function NovaOS({ hoje, nomes, inicial, pagoAtual = 0, produtos = [] }: { hoje: string; nomes: string[]; inicial?: InicialOS; pagoAtual?: number; produtos?: Produto[] }) {
   const formRef = useRef<HTMLFormElement>(null);
   const router = useRouter();
   const editando = !!inicial;
@@ -139,15 +140,34 @@ export default function NovaOS({ hoje, nomes, inicial, pagoAtual = 0 }: { hoje: 
         <ul className="divide-y divide-line">
           {itens.map((it, i) => (
             <li key={i} className="grid grid-cols-2 gap-2 p-3 md:grid-cols-12">
+              {produtos.length > 0 && !inicial && (
+                <div className="col-span-2 md:col-span-12">
+                  <label className="rotulo">Preencher com produto cadastrado (opcional)</label>
+                  <select
+                    className="campo"
+                    value=""
+                    onChange={(e) => {
+                      const p = produtos.find((x) => x.id === e.target.value);
+                      if (!p) return;
+                      const unit = p.unidade === "milheiro" ? p.preco / 1000 : p.preco;
+                      mudar(i, { servico: p.categoria, descricao: p.nome, unitario: paraCampo(unit), quantidade: p.unidade === "milheiro" ? "1000" : "1" });
+                    }}
+                  >
+                    <option value="">— escolher —</option>
+                    {produtos.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                  </select>
+                </div>
+              )}
               <div className="md:col-span-2">
                 <label className="rotulo">Tipo</label>
                 <select className="campo" value={it.servico} onChange={(e) => mudar(i, { servico: e.target.value })}>
                   {SERVICOS.map((s) => <option key={s}>{s}</option>)}
+                  {!SERVICOS.includes(it.servico as any) && <option>{it.servico}</option>}
                 </select>
               </div>
               <div className="col-span-2 md:col-span-5">
                 <label className="rotulo">Descrição do serviço</label>
-                <input className="campo" value={it.descricao} onChange={(e) => mudar(i, { descricao: e.target.value })} placeholder="Ex: Etiqueta 5x5 brilho, corte redondo" />
+                <input className="campo" value={it.descricao} onChange={(e) => mudar(i, { descricao: e.target.value })} placeholder="O que será produzido" />
               </div>
               <div className="md:col-span-1">
                 <label className="rotulo">Qtd</label>

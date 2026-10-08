@@ -15,7 +15,7 @@ export type Gasto = {
 };
 export type Fixa = { id: string; nome: string; categoria: string; valor: number; ativo: boolean };
 export type Config = { caixa_inicial: number; adicional_prioridade: number; markup_revenda: number; das_mensal: number; assessor_inicio: string };
-export type Preco = { tamanho: string; quantidade: number; preco: number };
+import type { Produto } from "./produtos";
 
 const n = (v: unknown) => Number(v ?? 0);
 
@@ -171,10 +171,21 @@ function fmt(v: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
 }
 
-export async function carregarPrecos() {
-  const rows = await q<Preco>(db().from("precos").select("*").order("quantidade"));
+export async function carregarProdutos() {
+  const rows = await q<Produto>(db().from("produtos").select("*").eq("ativo", true).order("nome"));
   return rows.map((r) => ({ ...r, preco: n(r.preco) }));
 }
+
+export async function carregarPadroes() {
+  const { data } = await db().from("config").select("prazo_padrao, pagamento_padrao, validade_dias, adicional_prioridade").maybeSingle();
+  return {
+    prazo: (data?.prazo_padrao as string | null) ?? "",
+    pagamento: (data?.pagamento_padrao as string | null) ?? "",
+    validade: Number(data?.validade_dias ?? 15),
+    adicional: Number(data?.adicional_prioridade ?? 0),
+  };
+}
+export type Padroes = Awaited<ReturnType<typeof carregarPadroes>>;
 
 export type OrcamentoItem = {
   id: string; orcamento_id: string; tipo: "etiqueta" | "manual"; servico: string;

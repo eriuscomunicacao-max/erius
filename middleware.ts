@@ -4,6 +4,8 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 const PUBLICAS = ["/login", "/cadastro"];
 
 export async function middleware(req: NextRequest) {
+  // Webhook da Asaas: autenticado pelo próprio token (header), sem sessão de usuário
+  if (req.nextUrl.pathname.startsWith("/api/asaas/")) return NextResponse.next();
   let res = NextResponse.next({ request: req });
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     cookies: {
@@ -31,6 +33,16 @@ export async function middleware(req: NextRequest) {
     url.pathname = "/";
     url.search = "";
     return NextResponse.redirect(url);
+  }
+  // Sem teste ativo nem pagamento → só a tela de assinatura (null = ainda sem empresa → segue pro onboarding)
+  if (user && !publica && path !== "/onboarding" && !path.startsWith("/assinatura")) {
+    const { data: liberado } = await supabase.rpc("acesso_liberado");
+    if (liberado === false) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/assinatura";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
   }
   return res;
 }

@@ -72,6 +72,19 @@ create table public.materiais (
   created_at timestamptz not null default now()
 );
 
+-- ---------- Produtos e serviços (catálogo livre) ----------
+create table public.produtos (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid not null default public.empresa_atual() references public.empresas(id) on delete cascade,
+  nome text not null,
+  categoria text not null default 'Outros',
+  unidade text not null default 'un',   -- un, milheiro, m², m, hora, serviço
+  preco numeric(12,2) not null default 0,
+  descricao text,
+  ativo boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
 -- ---------- Tabela de preços opcional (tamanho x quantidade) ----------
 create table public.precos (
   empresa_id uuid not null default public.empresa_atual() references public.empresas(id) on delete cascade,
@@ -216,6 +229,33 @@ create table public.envelopes (
   ordem integer not null default 0
 );
 
+-- ---------- Assinatura / teste grátis (só o servidor escreve) ----------
+create table public.assinaturas (
+  empresa_id uuid primary key references public.empresas(id) on delete cascade,
+  status text not null default 'trial' check (status in ('trial','ativo','vencido','cancelado','gratis')),
+  trial_ate timestamptz not null default (now() + interval '3 days'),
+  pago_ate timestamptz,
+  acesso_gratis boolean not null default false,
+  asaas_customer_id text,
+  asaas_subscription_id text,
+  created_at timestamptz not null default now()
+);
+create index assinaturas_customer_idx on public.assinaturas (asaas_customer_id);
+create index assinaturas_subscription_idx on public.assinaturas (asaas_subscription_id);
+
+-- true = acesso liberado | false = bloqueado | null = usuário ainda sem empresa
+create or replace function public.acesso_liberado()
+returns boolean
+language sql stable security definer
+set search_path = ''
+as $$
+  select a.acesso_gratis
+      or a.trial_ate > now()
+      or coalesce(a.pago_ate, 'epoch'::timestamptz) > now()
+  from public.assinaturas a
+  where a.empresa_id = public.empresa_atual()
+$$;
+
 -- Numeração sequencial por empresa (Orçamento #0001, OS #0001...)
 create or replace function public.definir_numero()
 returns trigger
@@ -240,14 +280,23 @@ do $$
 declare t text;
 begin
   foreach t in array array[
-    'config','materiais','precos','pedidos','pagamentos','gastos',
+    'config','materiais','produtos','precos','pedidos','pagamentos','gastos',
     'despesas_fixas','orcamentos','orcamento_itens','ordens_servico','os_itens','envelopes'
   ] loop
     execute format('alter table public.%I enable row level security', t);
     execute format(
-      'create policy tenant_isolation on public.%I for all to authenticated
-         using (empresa_id in (select public.minhas_empresas()))
-         with check (empresa_id in (select public.minhas_empresas()))', t);
+      'create policy tenant_select on public.%I for select to authenticated
+         using (empresa_id in (select public.minhas_empresas()))', t);
+    execute format(
+      'create policy tenant_insert on public.%I for insert to authenticated
+         with check (empresa_id in (select public.minhas_empresas()) and (select public.acesso_liberado()))', t);
+    execute format(
+      'create policy tenant_update on public.%I for update to authenticated
+         using (empresa_id in (select public.minhas_empresas()) and (select public.acesso_liberado()))
+         with check (empresa_id in (select public.minhas_empresas()) and (select public.acesso_liberado()))', t);
+    execute format(
+      'create policy tenant_delete on public.%I for delete to authenticated
+         using (empresa_id in (select public.minhas_empresas()) and (select public.acesso_liberado()))', t);
     if t <> 'config' and t <> 'precos' then
       execute format('create index on public.%I (empresa_id)', t);
     end if;
@@ -263,6 +312,10 @@ create policy empresa_update on public.empresas for update to authenticated
   with check (id in (select public.minhas_empresas()));
 
 -- membros: só leitura do próprio vínculo (escrita só via função)
+alter table public.assinaturas enable row level security;
+create policy assinatura_select on public.assinaturas for select to authenticated
+  using (empresa_id in (select public.minhas_empresas()));
+
 alter table public.membros enable row level security;
 create policy membros_select on public.membros for select to authenticated
   using (user_id = auth.uid());
@@ -286,6 +339,7 @@ begin
   insert into public.empresas (nome) values (trim(p_nome)) returning id into v_id;
   insert into public.membros (empresa_id, user_id, papel) values (v_id, auth.uid(), 'dono');
   insert into public.config (empresa_id) values (v_id);
+  insert into public.assinaturas (empresa_id) values (v_id);  -- teste grátis de 3 dias
 
   insert into public.envelopes (empresa_id, nome, pct, categoria, ordem) values
     (v_id, 'Material', 30, 'Material', 1),
@@ -304,9 +358,11 @@ revoke all on all functions in schema public from anon, public;
 grant usage on schema public to authenticated;
 grant select, insert, update, delete on all tables in schema public to authenticated;
 revoke insert, delete on public.empresas, public.membros from authenticated;
+revoke insert, update, delete on public.assinaturas from authenticated;  -- só o servidor (service_role) escreve
 revoke update on public.membros from authenticated;
 grant execute on function public.minhas_empresas() to authenticated;
 grant execute on function public.empresa_atual() to authenticated;
+grant execute on function public.acesso_liberado() to authenticated;
 grant execute on function public.criar_empresa(text) to authenticated;
 
 -- =========================================================

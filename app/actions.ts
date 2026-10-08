@@ -145,21 +145,12 @@ export async function salvarConfig(fd: FormData) {
       caixa_inicial: valor(fd.get("caixa_inicial")),
       adicional_prioridade: valor(fd.get("adicional_prioridade")),
       markup_revenda: valor(fd.get("markup_revenda")),
+      validade_dias: Math.round(valor(fd.get("validade_dias"))) || 15,
+      prazo_padrao: txt(fd.get("prazo_padrao")),
+      pagamento_padrao: txt(fd.get("pagamento_padrao")),
     })
   );
   tudo();
-}
-
-export async function salvarPreco(fd: FormData) {
-  await run(
-    db().from("precos").upsert({
-      empresa_id: (await getEmpresa()).id,
-      tamanho: txt(fd.get("tamanho")) ?? "",
-      quantidade: Math.round(valor(fd.get("quantidade"))),
-      preco: valor(fd.get("preco")),
-    })
-  );
-  revalidatePath("/config");
 }
 
 /* ---------- Orçamentos ---------- */

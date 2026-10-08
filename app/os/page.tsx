@@ -2,7 +2,7 @@ import Cabecalho from "@/components/Cabecalho";
 import Enviar from "@/components/Enviar";
 import Excluir from "@/components/Excluir";
 import NovaOS from "@/components/NovaOS";
-import { carregar, carregarOS, pagoPorPedido, type StatusOS } from "@/lib/data";
+import { carregar, carregarOS, carregarProdutos, pagoPorPedido, type StatusOS } from "@/lib/data";
 import { brl, dataBR, hoje } from "@/lib/format";
 import { registrarPagamento, statusOS, excluirOS } from "../actions";
 import { Valor } from "@/components/Privacidade";
@@ -43,7 +43,7 @@ function linkWhats(tel: string | null, msg: string) {
 }
 
 export default async function OrdensServico() {
-  const [b, ordens] = await Promise.all([carregar(), carregarOS()]);
+  const [b, ordens, produtos] = await Promise.all([carregar(), carregarOS(), carregarProdutos()]);
   const pagos = pagoPorPedido(b.pagamentos);
   const hj = hoje();
   const nomes = [...new Set(b.pedidos.map((p) => p.cliente))].sort();
@@ -72,7 +72,7 @@ export default async function OrdensServico() {
 
         <section className="painel p-5">
           <h2 className="titulo mb-4">Nova OS</h2>
-          <NovaOS hoje={hj} nomes={nomes} />
+          <NovaOS hoje={hj} nomes={nomes} produtos={produtos} />
         </section>
 
         <section className="painel p-5">

@@ -1,13 +1,13 @@
 import Cabecalho from "@/components/Cabecalho";
 import NovoOrcamento from "@/components/NovoOrcamento";
 import ListaOrcamentos from "@/components/ListaOrcamentos";
-import { carregarOrcamentos, carregarPrecos } from "@/lib/data";
+import { carregarOrcamentos, carregarProdutos, carregarPadroes } from "@/lib/data";
 import { hoje } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
 export default async function Orcamentos() {
-  const [orcamentos, precos] = await Promise.all([carregarOrcamentos(), carregarPrecos()]);
+  const [orcamentos, produtos, padroes] = await Promise.all([carregarOrcamentos(), carregarProdutos(), carregarPadroes()]);
   const pendentes = orcamentos.filter((o) => o.status === "pendente");
   const outros = orcamentos.filter((o) => o.status !== "pendente");
 
@@ -17,7 +17,7 @@ export default async function Orcamentos() {
       <div className="space-y-4 p-4 lg:p-5">
         <section className="painel p-5">
           <h2 className="titulo mb-4">Novo orçamento</h2>
-          <NovoOrcamento precos={precos} />
+          <NovoOrcamento produtos={produtos} padroes={padroes} />
         </section>
 
         <section className="painel p-5">
