@@ -364,10 +364,14 @@ export async function excluirOS(fd: FormData) {
   const s = db();
   const id = String(fd.get("id"));
   const { data: os } = await s.from("ordens_servico").select("pedido_id, numero").eq("id", id).single();
+  // arquivos de layout saem do Storage junto (as linhas do banco caem em cascata)
+  const { data: arqs } = await s.from("os_arquivos").select("path").eq("os_id", id);
+  if (arqs?.length) await s.storage.from("layouts").remove(arqs.map((a) => a.path as string));
   // apaga o pedido junto (e os pagamentos dele), pra não sobrar cobrança fantasma
   if (os?.pedido_id) await run(s.from("pedidos").delete().eq("id", os.pedido_id));
   await run(s.from("ordens_servico").delete().eq("id", id));
   tudo();
+  revalidatePath("/producao");
 }
 
 /* ---------- Meu Assessor ---------- */

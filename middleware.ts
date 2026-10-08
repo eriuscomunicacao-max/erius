@@ -21,7 +21,9 @@ export async function middleware(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   const path = req.nextUrl.pathname;
   const publica = PUBLICAS.some((p) => path === p || path.startsWith(p + "/"));
+  const livre = path === "/convite" || path.startsWith("/convite/"); // convite funciona logado ou não
 
+  if (livre) return res;
   if (!user && !publica) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
@@ -34,15 +36,22 @@ export async function middleware(req: NextRequest) {
     url.search = "";
     return NextResponse.redirect(url);
   }
-  // Sem teste ativo nem pagamento → só a tela de assinatura (null = ainda sem empresa → segue pro onboarding)
-  if (user && !publica && path !== "/onboarding" && !path.startsWith("/assinatura")) {
-    const { data: liberado } = await supabase.rpc("acesso_liberado");
-    if (liberado === false) {
+
+  if (user && !publica && path !== "/onboarding") {
+    // 1 chamada traz: acesso liberado? (true/false/null=sem empresa) e papel (dono/equipe)
+    const { data: ctx } = await supabase.rpc("contexto_acesso");
+    const liberado = (ctx as { liberado?: boolean | null } | null)?.liberado;
+    const papel = (ctx as { papel?: string | null } | null)?.papel;
+    const ir = (destino: string) => {
       const url = req.nextUrl.clone();
-      url.pathname = "/assinatura";
+      url.pathname = destino;
       url.search = "";
       return NextResponse.redirect(url);
-    }
+    };
+    // Funcionário: só Produção (e a tela de aviso se o acesso da empresa estiver suspenso)
+    if (papel === "equipe" && !path.startsWith("/producao") && !path.startsWith("/assinatura")) return ir("/producao");
+    // Sem teste ativo nem pagamento → só a tela de assinatura
+    if (liberado === false && !path.startsWith("/assinatura")) return ir("/assinatura");
   }
   return res;
 }

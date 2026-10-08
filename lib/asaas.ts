@@ -52,24 +52,41 @@ export async function criarAssinatura(d: {
   }
 }
 
-type Cobranca = { id: string; status: string; invoiceUrl?: string; dueDate?: string };
+export type Cobranca = { id: string; status: string; invoiceUrl?: string; dueDate?: string; value?: number };
 
 export async function cobrancasDaAssinatura(id: string) {
   const r = await chamar<{ data: Cobranca[] }>("GET", `/subscriptions/${encodeURIComponent(id)}/payments?limit=10`);
   return r.data ?? [];
 }
 
-/** Link da cobrança em aberto (a mais antiga pendente/vencida). Tenta de novo se a 1ª ainda não foi gerada. */
-export async function linkDaCobrancaEmAberto(subscriptionId: string) {
+/** Cobrança em aberto (a mais antiga pendente/vencida). Tenta de novo se a 1ª ainda não foi gerada. */
+export async function cobrancaEmAberto(subscriptionId: string): Promise<Cobranca | null> {
   for (let tentativa = 0; tentativa < 3; tentativa++) {
     const lista = await cobrancasDaAssinatura(subscriptionId);
     const aberta = lista
-      .filter((c) => (c.status === "PENDING" || c.status === "OVERDUE") && c.invoiceUrl)
+      .filter((c) => c.status === "PENDING" || c.status === "OVERDUE")
       .sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate)))[0];
-    if (aberta?.invoiceUrl) return aberta.invoiceUrl;
+    if (aberta) return aberta;
     await new Promise((r) => setTimeout(r, 700));
   }
   return null;
+}
+
+/** QR Code Pix da cobrança: imagem (base64), "copia e cola" e validade. */
+export const qrPix = (paymentId: string) =>
+  chamar<{ encodedImage: string; payload: string; expirationDate?: string }>("GET", `/payments/${encodeURIComponent(paymentId)}/pixQrCode`);
+
+/** Muda o valor das próximas cobranças (e da pendente, se houver). A Asaas aceita PUT; cai pra POST se necessário. */
+export async function atualizarValorAssinatura(id: string, value: number) {
+  const corpo = { value, updatePendingPayments: true };
+  try {
+    return await chamar<{ id: string }>("PUT", `/subscriptions/${encodeURIComponent(id)}`, corpo);
+  } catch (e) {
+    if (e instanceof AsaasErro && (e.status === 404 || e.status === 405)) {
+      return chamar<{ id: string }>("POST", `/subscriptions/${encodeURIComponent(id)}`, corpo);
+    }
+    throw e;
+  }
 }
 
 export const cancelarAssinatura = (id: string) => chamar<{ deleted?: boolean }>("DELETE", `/subscriptions/${encodeURIComponent(id)}`);

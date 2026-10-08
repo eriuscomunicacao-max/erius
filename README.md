@@ -42,7 +42,7 @@ Tela **Materiais**: nome, unidade (un, m, m², folha, milheiro, kg...), custo, f
 ## Assinatura, teste grátis e Asaas
 
 - Toda conta nova ganha **3 dias de teste grátis**. Acabou o teste sem pagar, o app bloqueia tudo (middleware **e** banco) e mostra só a tela **Assinatura**. Os dados continuam salvos e podem ser lidos; só não dá pra criar/alterar.
-- A cobrança é uma **assinatura mensal na Asaas** (o cliente escolhe Pix, boleto ou cartão na página da Asaas). O acesso é liberado por **webhook** quando o pagamento é confirmado, e vale até o vencimento + 1 mês + 3 dias de carência.
+- A cobrança é uma **assinatura mensal na Asaas**. Depois de clicar em Assinar, o cliente paga com **Pix dentro do app** (QR Code e copia e cola, com confirmação automática na tela) ou escolhe cartão/boleto na página segura da Asaas. **Cadastre uma chave Pix na sua conta Asaas**, senão o QR só vale até 23:59 do dia. O acesso é liberado por **webhook** quando o pagamento é confirmado, e vale até o vencimento + 1 mês + 3 dias de carência.
 - O usuário **não consegue** liberar o próprio acesso: a tabela `assinaturas` só é escrita pelo servidor (service_role).
 
 ### Configurar a Asaas
@@ -61,3 +61,11 @@ No SQL Editor do Supabase (troque o e-mail):
 update public.assinaturas set acesso_gratis = true, status = 'gratis'
 where empresa_id in (select m.empresa_id from public.membros m join auth.users u on u.id = m.user_id where u.email = 'SEU@EMAIL.COM');
 ```
+
+## Equipe (funcionários)
+
+- Em **Equipe** o dono gera um link de convite (vale 7 dias, uso único). O funcionário cria o próprio login e entra de qualquer computador.
+- O funcionário vê **só a tela Produção**: ordens de serviço em andamento com itens, quantidades, prazo, observações e o **arquivo de layout**. Ele pode mover a OS entre *aberta / em produção / pronta*. **Não vê valores, clientes, caixa, orçamentos, configurações nem assinatura.**
+- A separação é garantida no **banco** (RLS + funções `producao_os`, `producao_itens`, `os_mudar_status`), não só no menu: mesmo chamando a API direto, o funcionário não lê nada além da produção.
+- **Cobrança:** 1 funcionário incluso. Cada adicional soma o valor do plano na mensalidade (o app atualiza a assinatura na Asaas; vale a partir da próxima fatura). Vagas adicionais só com assinatura ativa. Remover funcionário ou cancelar convite baixa a cobrança.
+- **Arquivos de layout:** o dono anexa na OS (PNG, JPG, WEBP ou PDF, até 10 MB). O envio vai direto do navegador pro Storage (bucket privado `layouts`), e quem vê usa links temporários.

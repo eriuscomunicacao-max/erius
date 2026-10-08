@@ -6,6 +6,7 @@ import { PrivacidadeProvider } from "@/components/Privacidade";
 import { getEmpresaOuNull } from "@/lib/empresa";
 import { db } from "@/lib/supabase";
 import { getAssinatura } from "@/lib/assinatura";
+import { meuPapel } from "@/lib/papel";
 import { estadoDe, diasRestantes } from "@/lib/assinatura-regras";
 import BannerAssinatura from "@/components/BannerAssinatura";
 
@@ -21,7 +22,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     const { data } = await db().storage.from("logos").createSignedUrl(emp.logo_path, 3600);
     logoUrl = data?.signedUrl ?? null;
   }
-  const ass = emp ? await getAssinatura() : null;
+  const papel = emp ? await meuPapel() : null;
+  const ass = emp && papel === "dono" ? await getAssinatura() : null;
   const emTeste = ass && estadoDe(ass) === "trial";
   return (
     <html lang="pt-BR">
@@ -38,7 +40,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           {emp ? (
             <>
               <Suspense fallback={<div className="lg:w-[218px]" />}>
-                <Sidebar nome={emp.nome} logoUrl={logoUrl} />
+                <Sidebar nome={emp.nome} logoUrl={logoUrl} papel={papel} />
               </Suspense>
               <main className="min-w-0 flex-1">
                 {emTeste && <BannerAssinatura dias={diasRestantes(ass!.trial_ate)} />}

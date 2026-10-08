@@ -3,6 +3,8 @@ import Enviar from "@/components/Enviar";
 import { Valor } from "@/components/Privacidade";
 import { getEmpresa } from "@/lib/empresa";
 import { getAssinatura, precoDoPlano } from "@/lib/assinatura";
+import { meuPapel } from "@/lib/papel";
+import { valorMensal } from "@/lib/assentos";
 import { estadoDe, diasRestantes } from "@/lib/assinatura-regras";
 import { db } from "@/lib/supabase";
 import { brl, dataBR } from "@/lib/format";
@@ -11,10 +13,23 @@ import { iniciarAssinatura, abrirCobranca, cancelarMinhaAssinatura, sairDaTelaAs
 export const dynamic = "force-dynamic";
 
 export default async function Assinatura({ searchParams }: { searchParams: { erro?: string; ok?: string } }) {
-  const [emp, a] = await Promise.all([getEmpresa(), getAssinatura()]);
+  const [emp, a, papel] = await Promise.all([getEmpresa(), getAssinatura(), meuPapel()]);
+  if (papel === "equipe") {
+    return (
+      <>
+        <Cabecalho titulo="Acesso suspenso" sub={emp.nome} />
+        <div className="mx-auto max-w-2xl p-4 lg:p-5">
+          <p className="painel p-5 text-sm text-ink">O acesso da empresa está suspenso no momento. Fale com o responsável para regularizar a assinatura.</p>
+          <form action={sairDaTelaAssinatura} className="mt-3"><button className="text-sm text-mute underline">Sair da conta</button></form>
+        </div>
+      </>
+    );
+  }
   const { data: { user } } = await db().auth.getUser();
   const estado = a ? estadoDe(a) : "expirado";
-  const preco = precoDoPlano();
+  const base = precoDoPlano();
+  const extras = a?.assentos_extra ?? 0;
+  const preco = valorMensal(base, extras);
   const pagoAte = a?.pago_ate ? a.pago_ate.slice(0, 10) : null;
   const cancelada = a?.status === "cancelado";
   const temAssinatura = !!a?.asaas_subscription_id && !cancelada;
@@ -47,7 +62,7 @@ export default async function Assinatura({ searchParams }: { searchParams: { err
           )}
           {estado !== "gratis" && (
             <p className="mt-2 text-sm text-mute">
-              Plano mensal: <span className="font-semibold text-ink"><Valor>{brl(preco)}</Valor></span> por mês · pague por Pix, boleto ou cartão.
+              Plano mensal: <span className="font-semibold text-ink"><Valor>{brl(preco)}</Valor></span> por mês{extras > 0 ? ` (inclui ${extras} funcionário${extras > 1 ? "s" : ""} adicional${extras > 1 ? "is" : ""})` : ""} · pague por Pix, boleto ou cartão.
             </p>
           )}
         </section>
@@ -71,7 +86,7 @@ export default async function Assinatura({ searchParams }: { searchParams: { err
               <div className="sm:col-span-2">
                 <Enviar>Assinar por <Valor>{brl(preco)}</Valor>/mês</Enviar>
                 <p className="mt-2 text-xs text-mute">
-                  Você será levado à página segura de pagamento da Asaas. O acesso é liberado automaticamente quando o pagamento é confirmado.
+                  Na próxima tela você paga com Pix (QR Code ou copia e cola) sem sair do app, ou escolhe cartão/boleto na página segura da Asaas. O acesso é liberado automaticamente quando o pagamento é confirmado.
                   {estado === "trial" && " A primeira cobrança vence quando o teste terminar."}
                 </p>
               </div>
@@ -81,7 +96,7 @@ export default async function Assinatura({ searchParams }: { searchParams: { err
 
         {temAssinatura && (
           <section className="painel flex flex-wrap items-center gap-3 p-5">
-            <form action={abrirCobranca}><button className="botao2">Ver cobrança em aberto</button></form>
+            <form action={abrirCobranca}><button className="botao2">Pagar cobrança em aberto</button></form>
             <form action={cancelarMinhaAssinatura}><button className="botao2 text-magenta">Cancelar assinatura</button></form>
             <p className="w-full text-xs text-mute">Cancelando, você mantém o acesso até o fim do período já pago.</p>
           </section>

@@ -6,7 +6,8 @@ import { adminDb } from "@/lib/supabase-admin";
 import { getEmpresa } from "@/lib/empresa";
 import { getAssinatura, precoDoPlano } from "@/lib/assinatura";
 import { primeiroVencimento } from "@/lib/assinatura-regras";
-import { AsaasErro, criarCliente, criarAssinatura, linkDaCobrancaEmAberto, cancelarAssinatura } from "@/lib/asaas";
+import { valorMensal } from "@/lib/assentos";
+import { AsaasErro, criarCliente, criarAssinatura, cancelarAssinatura } from "@/lib/asaas";
 
 const voltar = (msg: string): never => redirect(`/assinatura?erro=${encodeURIComponent(msg)}`);
 
@@ -40,7 +41,6 @@ export async function iniciarAssinatura(fd: FormData) {
   if (!email.includes("@")) return voltar("Informe um e-mail válido.");
   if (!documentoValido(doc)) return voltar("CPF ou CNPJ inválido. Confira os números.");
 
-  let link: string | null = null;
   try {
     const admin = adminDb();
     let customerId = a.asaas_customer_id;
@@ -53,7 +53,7 @@ export async function iniciarAssinatura(fd: FormData) {
       subId = (
         await criarAssinatura({
           customer: customerId,
-          value: precoDoPlano(),
+          value: valorMensal(precoDoPlano(), a.assentos_extra ?? 0),
           nextDueDate: primeiroVencimento(a.trial_ate),
           description: "Assinatura OrçaGrafica",
           externalReference: emp.id,
@@ -61,28 +61,18 @@ export async function iniciarAssinatura(fd: FormData) {
       ).id;
       await admin.from("assinaturas").update({ asaas_subscription_id: subId, status: a.status === "cancelado" ? "vencido" : a.status }).eq("empresa_id", emp.id);
     }
-    link = await linkDaCobrancaEmAberto(subId);
   } catch (e) {
     console.error("iniciarAssinatura:", e);
-        return voltar(`Não foi possível criar a cobrança: ${e instanceof AsaasErro ? e.detalhe : e instanceof Error ? e.message.slice(0, 160) : "erro desconhecido"}`);
+    return voltar(`Não foi possível criar a cobrança: ${e instanceof AsaasErro ? e.detalhe : e instanceof Error ? e.message.slice(0, 160) : "erro desconhecido"}`);
   }
-  if (!link) return voltar("A cobrança foi criada, mas o link ainda não ficou pronto. Clique em \"Ver cobrança em aberto\" em instantes.");
-  redirect(link);
+  redirect("/assinatura/pagar");
 }
 
 export async function abrirCobranca() {
   await getEmpresa();
   const a = await getAssinatura();
   if (!a?.asaas_subscription_id) return voltar("Você ainda não tem uma assinatura.");
-  let link: string | null = null;
-  try {
-    link = await linkDaCobrancaEmAberto(a.asaas_subscription_id);
-  } catch (e) {
-    console.error("abrirCobranca:", e);
-    return voltar("Não foi possível buscar a cobrança agora.");
-  }
-  if (!link) return voltar("Nenhuma cobrança em aberto no momento.");
-  redirect(link);
+  redirect("/assinatura/pagar");
 }
 
 export async function cancelarMinhaAssinatura() {

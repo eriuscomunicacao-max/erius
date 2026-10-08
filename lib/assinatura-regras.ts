@@ -10,6 +10,7 @@ export type Assinatura = {
   acesso_gratis: boolean;
   asaas_customer_id: string | null;
   asaas_subscription_id: string | null;
+  assentos_extra?: number;
 };
 
 /** Mesma regra do banco (função acesso_liberado): grátis > pago > teste > expirado. */

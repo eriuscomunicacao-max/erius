@@ -5,7 +5,7 @@ import Logo from "./Logo";
 import { sair } from "@/app/auth-actions";
 import { ICasa, ICarteira, IEtiqueta, IPessoas, IGrafico, IEngrenagem, IPedido, IOS, IAssessor, IRelatorio } from "./Icones";
 
-const itens = [
+const itensDono = [
   { href: "/", nome: "Dashboard", I: ICasa },
   { href: "/assessor", nome: "Meu Assessor", I: IAssessor },
   { href: "/fluxo", nome: "Fluxo de Caixa", I: ICarteira },
@@ -17,15 +17,19 @@ const itens = [
   { href: "/relatorio", nome: "Relatório Mensal", I: IRelatorio },
   { href: "/produtos", nome: "Produtos e serviços", I: IEtiqueta },
   { href: "/materiais", nome: "Materiais", I: IEtiqueta },
+  { href: "/equipe", nome: "Equipe", I: IPessoas },
   { href: "/assinatura", nome: "Assinatura", I: ICarteira },
   { href: "/config", nome: "Configurações", I: IEngrenagem },
 ];
 
-export default function Sidebar({ nome, logoUrl }: { nome: string; logoUrl: string | null }) {
+const itensEquipe = [{ href: "/producao", nome: "Produção", I: IOS }];
+
+export default function Sidebar({ nome, logoUrl, papel }: { nome: string; logoUrl: string | null; papel: "dono" | "equipe" | null }) {
   const path = usePathname();
   const sp = useSearchParams();
   const mes = sp.get("mes");
   const q = mes ? `?mes=${mes}` : "";
+  const itens = papel === "equipe" ? itensEquipe : itensDono;
   return (
     <aside className="border-line bg-[#050505] lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-[218px] lg:shrink-0 lg:flex-col lg:border-r">
       <div className="flex h-[76px] items-center border-b border-line px-5 lg:h-[100px] lg:px-7">

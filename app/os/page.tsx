@@ -2,6 +2,9 @@ import Cabecalho from "@/components/Cabecalho";
 import Enviar from "@/components/Enviar";
 import Excluir from "@/components/Excluir";
 import NovaOS from "@/components/NovaOS";
+import ArquivosOS from "@/components/ArquivosOS";
+import { arquivosPorOS, type Arquivo } from "@/lib/arquivos";
+import { getEmpresa } from "@/lib/empresa";
 import { carregar, carregarOS, carregarProdutos, pagoPorPedido, type StatusOS } from "@/lib/data";
 import { brl, dataBR, hoje } from "@/lib/format";
 import { registrarPagamento, statusOS, excluirOS } from "../actions";
@@ -46,6 +49,8 @@ export default async function OrdensServico() {
   const [b, ordens, produtos] = await Promise.all([carregar(), carregarOS(), carregarProdutos()]);
   const pagos = pagoPorPedido(b.pagamentos);
   const hj = hoje();
+  const emp = await getEmpresa();
+  const arquivos = await arquivosPorOS(ordens.map((o) => o.id));
   const nomes = [...new Set(b.pedidos.map((p) => p.cliente))].sort();
 
   const lista = ordens.map((o) => {
@@ -78,7 +83,7 @@ export default async function OrdensServico() {
         <section className="painel p-5">
           <h2 className="titulo mb-4">Em andamento <span className="text-sm font-normal text-mute">(ordenadas pelo prazo)</span></h2>
           {andamento.length ? (
-            <ul className="space-y-3">{andamento.map((o) => <CartaoOS key={o.id} o={o} hj={hj} />)}</ul>
+            <ul className="space-y-3">{andamento.map((o) => <CartaoOS key={o.id} o={o} hj={hj} empresaId={emp.id} arquivos={arquivos.get(o.id) ?? []} />)}</ul>
           ) : (
             <p className="text-sm text-mute">Nenhuma OS em andamento.</p>
           )}
@@ -87,7 +92,7 @@ export default async function OrdensServico() {
         {entregues.length > 0 && (
           <details className="painel p-5">
             <summary className="titulo cursor-pointer">Entregues <span className="text-sm font-normal text-mute">({entregues.length})</span></summary>
-            <ul className="mt-4 space-y-3">{entregues.map((o) => <CartaoOS key={o.id} o={o} hj={hj} />)}</ul>
+            <ul className="mt-4 space-y-3">{entregues.map((o) => <CartaoOS key={o.id} o={o} hj={hj} empresaId={emp.id} arquivos={arquivos.get(o.id) ?? []} />)}</ul>
           </details>
         )}
       </div>
@@ -106,7 +111,7 @@ function Resumo({ rotulo, valor, cls }: { rotulo: string; valor: string; cls: st
 
 type Linha = Awaited<ReturnType<typeof carregarOS>>[number] & { total: number; pago: number; falta: number };
 
-function CartaoOS({ o, hj }: { o: Linha; hj: string }) {
+function CartaoOS({ o, hj, empresaId, arquivos }: { o: Linha; hj: string; empresaId: string; arquivos: Arquivo[] }) {
   const numero = String(o.numero).padStart(4, "0");
   const prazo = prazoInfo(o.prazo_entrega, hj, o.status);
   const msg =
@@ -145,6 +150,8 @@ function CartaoOS({ o, hj }: { o: Linha; hj: string }) {
           </div>
         </div>
       </div>
+
+      <ArquivosOS osId={o.id} empresaId={empresaId} arquivos={arquivos} podeEditar />
 
       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
         <div className="flex overflow-hidden rounded-lg border border-line">
