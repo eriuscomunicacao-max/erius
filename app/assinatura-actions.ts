@@ -64,7 +64,7 @@ export async function iniciarAssinatura(fd: FormData) {
     link = await linkDaCobrancaEmAberto(subId);
   } catch (e) {
     console.error("iniciarAssinatura:", e);
-    return voltar(e instanceof AsaasErro ? `Não foi possível criar a cobrança: ${e.detalhe}` : "Não foi possível criar a cobrança agora. Tente de novo em instantes.");
+        return voltar(`Não foi possível criar a cobrança: ${e instanceof AsaasErro ? e.detalhe : e instanceof Error ? e.message.slice(0, 160) : "erro desconhecido"}`);
   }
   if (!link) return voltar("A cobrança foi criada, mas o link ainda não ficou pronto. Clique em \"Ver cobrança em aberto\" em instantes.");
   redirect(link);
