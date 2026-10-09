@@ -24,6 +24,9 @@ export async function middleware(req: NextRequest) {
   const livre = path === "/convite" || path.startsWith("/convite/"); // convite funciona logado ou não
 
   if (livre) return res;
+  if (path === "/lp") return res; // landing de vendas: pública, logado ou não
+  // visitante sem login no endereço principal vê a landing (a URL continua "/")
+  if (!user && path === "/") return NextResponse.rewrite(new URL("/lp", req.url));
   if (!user && !publica) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
