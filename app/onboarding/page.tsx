@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import Enviar from "@/components/Enviar";
+import MetaPixel from "@/components/MetaPixel";
 import { getEmpresaOuNull } from "@/lib/empresa";
 import { criarEmpresa } from "../auth-actions";
 
@@ -9,6 +10,7 @@ export default async function Onboarding({ searchParams }: { searchParams: { err
   if (await getEmpresaOuNull()) redirect("/");
   return (
     <div className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-5">
+      <MetaPixel evento="CompleteRegistration" umaVez="registro" dados={{ content_name: "Cadastro OrçaGrafica", status: true }} />
       <h1 className="font-display text-3xl font-bold">Quase lá</h1>
       <p className="mb-6 mt-1 text-mute">Como se chama a sua gráfica? Depois você completa logo, cores e dados em Configurações.</p>
       {searchParams.erro && <p className="mb-3 rounded-lg border border-magenta/40 p-3 text-sm text-magenta" role="alert">{searchParams.erro}</p>}
