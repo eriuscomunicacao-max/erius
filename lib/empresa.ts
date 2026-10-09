@@ -38,8 +38,6 @@ export function coresPdf(e: Empresa) {
   return { PRIM: a, SEC: b, MIX: m };
 }
 
-/** Remove caracteres que a fonte padrão do PDF não suporta (emoji etc.). */
-export const pdfTxt = (v: string | null | undefined) => (v ?? "").replace(/[^\u0020-\u007E\u00A0-\u00FF]/g, "").trim();
 
 /** Baixa a logo da empresa do Storage (PNG/JPG). Devolve null se não houver. */
 export async function logoDaEmpresa(e: Empresa): Promise<{ bytes: Uint8Array; png: boolean } | null> {
@@ -68,3 +66,6 @@ export async function desenharLogo(
     return false;
   }
 }
+
+
+export { pdfTxt, telefoneBR, documentoBR, rodapeInfo } from "./pdf-texto";
