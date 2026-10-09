@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Cabecalho from "@/components/Cabecalho";
 import PagamentoPix from "@/components/PagamentoPix";
+import MetaPixel from "@/components/MetaPixel";
 import { getEmpresa } from "@/lib/empresa";
 import { getAssinatura, precoDoPlano } from "@/lib/assinatura";
 import { estadoDe } from "@/lib/assinatura-regras";
@@ -31,14 +32,23 @@ export default async function Pagar() {
     console.error("pagar/qr:", e); // sem chave Pix na Asaas, por exemplo → cai pro link seguro
   }
 
+  const valorNum = Number(cobranca.value ?? precoDoPlano());
+  const primeira = !a.pago_ate; // 1º pagamento = venda nova (renovação não conta como compra nos anúncios)
+
   return (
     <>
       <Cabecalho titulo="Pagamento" sub="Pix, cartão ou boleto" />
       <div className="mx-auto max-w-3xl space-y-4 p-4 lg:p-5">
+        {primeira && (
+          <MetaPixel evento="InitiateCheckout" umaVez={`ic_${cobranca.id}`} dados={{ value: valorNum, currency: "BRL", content_name: "Assinatura OrçaGrafica" }} />
+        )}
         <PagamentoPix
+          cobrancaId={cobranca.id}
+          valorNum={valorNum}
+          primeira={primeira}
           imagem={qr?.encodedImage ?? null}
           payload={qr?.payload ?? null}
-          valor={brl(cobranca.value ?? precoDoPlano())}
+          valor={brl(valorNum)}
           vencimento={cobranca.dueDate ? dataBR(cobranca.dueDate) : "—"}
           invoiceUrl={cobranca.invoiceUrl ?? null}
         />
