@@ -11,8 +11,12 @@ const nextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          { key: "X-Robots-Tag", value: "noindex, nofollow" },
         ],
+      },
+      {
+        // o sistema fica fora do Google; só a landing ("/" e "/lp") pode aparecer
+        source: "/:path((?!lp).+)",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
       },
     ];
   },
