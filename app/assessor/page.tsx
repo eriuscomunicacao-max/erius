@@ -19,7 +19,9 @@ const COR: Record<string, { txt: string; barra: string; borda: string }> = {
   "Pró-labore": { txt: "text-amarelo", barra: "bg-amarelo", borda: "border-amarelo/40" },
   "Caixa da empresa": { txt: "text-ciano", barra: "bg-ciano", borda: "border-ciano/40" },
 };
-const corDe = (cat: string) => COR[cat] ?? { txt: "text-ink", barra: "bg-mute", borda: "border-line" };
+// Cores dos 4 envelopes sugeridos; os criados pelo cliente giram por esta paleta
+const PALETA = [COR.Material, COR["Anúncios (Ads)"], COR["Pró-labore"], COR["Caixa da empresa"]];
+const corDe = (cat: string, i: number) => COR[cat] ?? PALETA[i % PALETA.length];
 const fmtX = (v: number) => `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}x`;
 
 export default async function Assessor({ searchParams }: { searchParams: { mes?: string } }) {
@@ -65,15 +67,15 @@ export default async function Assessor({ searchParams }: { searchParams: { mes?:
 
         {/* Envelopes */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {a.envelopes.map((e) => {
-            const c = corDe(e.categoria);
+          {a.envelopes.map((e, i) => {
+            const c = corDe(e.categoria, i);
             const usado = e.entrou > 0 ? Math.min(1, e.gasto / e.entrou) : e.gasto > 0 ? 1 : 0;
             return (
               <section key={e.id} className={`painel border p-5 ${c.borda}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h2 className="titulo">{e.nome}</h2>
-                    <p className="text-xs text-mute">{e.pct.toLocaleString("pt-BR")}% do recebido · gastos em "{categoriasDoEnvelope(e.categoria).join('", "')}"</p>
+                    <p className="text-xs text-mute">{e.pct.toLocaleString("pt-BR")}% do recebido · gastos em "{categoriasDoEnvelope(e).join('", "')}"</p>
                   </div>
                   <div className="text-right">
                     <div className="text-xs text-mute">Disponível</div>
@@ -105,26 +107,26 @@ export default async function Assessor({ searchParams }: { searchParams: { mes?:
                       </Linha>
                     )
                   )}
-                  {!e.reposicao && e.categoria === "Material" && (
+                  {!e.reposicao && e.tipo === "reposicao" && (
                     <Linha tipo="info">Lance uma compra de {e.nome.toLowerCase()} em Gastos para calcular o preço de reposição.</Linha>
                   )}
 
-                  {e.categoria === "Anúncios (Ads)" && a.roas && (
+                  {e.tipo === "trafego" && a.roas && (
                     a.roas.mes !== null ? (
                       <Linha tipo={a.roas.mes >= 3 ? "ok" : "info"}>
                         Retorno do tráfego no mês: {fmtX(a.roas.mes)} (cada R$ 1 em anúncio virou <Valor>{brl(a.roas.mes)}</Valor> em vendas).
                         {a.roas.periodo !== null && ` Acumulado: ${fmtX(a.roas.periodo)}.`}
                       </Linha>
                     ) : (
-                      <Linha tipo="info">Lance os gastos de anúncio em Gastos (categoria Anúncios) pra ver o retorno do tráfego.</Linha>
+                      <Linha tipo="info">Lance os gastos de anúncio em Gastos (categoria {categoriasDoEnvelope(e).join(", ")}) pra ver o retorno do tráfego.</Linha>
                     )
                   )}
 
                   <FormReset action={retirarEnvelope} className="flex flex-wrap items-center gap-2 pt-1">
-                    {categoriasDoEnvelope(e.categoria).length > 1 ? (
+                    {categoriasDoEnvelope(e).length > 1 ? (
                       <select name="categoria" className="campo w-auto py-1.5 text-sm" aria-label="Para que foi o gasto">
                         <option value={e.categoria}>Reserva / outros</option>
-                        {categoriasDoEnvelope(e.categoria).slice(1).map((c) => <option key={c} value={c}>{c}</option>)}
+                        {categoriasDoEnvelope(e).slice(1).map((c) => <option key={c} value={c}>{c}</option>)}
                       </select>
                     ) : (
                       <input type="hidden" name="categoria" value={e.categoria} />
