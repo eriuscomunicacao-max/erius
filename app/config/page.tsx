@@ -9,14 +9,24 @@ import { brl } from "@/lib/format";
 import { CATEGORIAS_GASTO } from "@/lib/constants";
 import { getEmpresa } from "@/lib/empresa";
 import { salvarEmpresa, enviarLogo, removerLogo } from "../empresa-actions";
-import { salvarConfig, criarFixa, alternarFixa, excluirFixa, salvarAssessor, atualizarFixa } from "../actions";
+import { salvarConfig, criarFixa, alternarFixa, excluirFixa, atualizarFixa } from "../actions";
+import { salvarAssessor, excluirEnvelope, restaurarSugestaoAssessor } from "../assessor-actions";
+import BotaoConfirmar from "@/components/BotaoConfirmar";
 import Editar, { Campo } from "@/components/Editar";
 import { paraCampo } from "@/lib/format";
 import { Valor } from "@/components/Privacidade";
 
 export const dynamic = "force-dynamic";
 
-export default async function Config() {
+// "Impostos (DAS)" tem reserva própria, por isso não aparece como categoria de envelope
+const CATS_ENV = CATEGORIAS_GASTO.filter((c) => c !== "Impostos (DAS)");
+const TIPOS = [
+  { v: "comum", t: "Comum" },
+  { v: "reposicao", t: "Reposição de material (avisa quando dá pra comprar)" },
+  { v: "trafego", t: "Anúncios (mostra o retorno do tráfego)" },
+];
+
+export default async function Config({ searchParams }: { searchParams: { erro?: string; ok?: string } }) {
   const [b, envelopes, emp, padroes] = await Promise.all([carregar(), carregarEnvelopes(), getEmpresa(), carregarPadroes()]);
   const somaPct = (envelopes ?? []).reduce((t, e) => t + e.pct, 0);
   const c = b.config;
@@ -26,6 +36,8 @@ export default async function Config() {
     <>
       <Cabecalho titulo="Configurações" sub="Empresa, caixa, padrões do orçamento e despesas fixas" />
       <div className="space-y-4 p-4 lg:p-5">
+        {searchParams.erro && <p className="rounded-lg border border-magenta/40 p-3 text-sm text-magenta" role="alert">{searchParams.erro}</p>}
+        {searchParams.ok && <p className="rounded-lg border border-ciano/40 p-3 text-sm text-ciano">{searchParams.ok}</p>}
         <section className="painel p-5">
           <h2 className="titulo mb-1">Sua empresa</h2>
           <p className="mb-4 text-xs text-mute">Esses dados, a logo e as cores aparecem nos PDFs de orçamento, ordem de serviço e relatório.</p>
@@ -130,21 +142,94 @@ export default async function Config() {
           </section>
         </div>
 
-        <section className="painel p-5">
+        <section id="assessor" className="painel scroll-mt-20 p-5">
           <h2 className="titulo mb-1">Meu Assessor</h2>
-          <p className="mb-4 text-xs text-mute">Quanto de cada real recebido vai para cada envelope.</p>
+          <p className="mb-4 text-xs text-mute">
+            Divida o dinheiro recebido do jeito que fizer sentido para a sua gráfica. Os envelopes abaixo são só uma sugestão: renomeie,
+            mude as porcentagens, escolha de onde cada um paga e crie ou remova envelopes.
+          </p>
           {envelopes ? (
             <form action={salvarAssessor} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-                {envelopes.map((e) => (
-                  <div key={e.id}>
-                    <input type="hidden" name="env_id" value={e.id} />
-                    <label className="rotulo" htmlFor={`pct_${e.id}`}>{e.nome} (%)</label>
-                    <input id={`pct_${e.id}`} name={`pct_${e.id}`} defaultValue={fmt(e.pct)} inputMode="decimal" className="campo" />
-                    <div className="mt-1 text-[11px] text-mute">sai de "{e.categoria}"</div>
-                  </div>
-                ))}
+              {/* botão padrão invisível: o Enter nos campos salva (em vez de acionar o primeiro "Remover") */}
+              <button type="submit" className="sr-only" tabIndex={-1} aria-hidden>Salvar</button>
+              <div className="space-y-3">
+                {envelopes.map((e) => {
+                  const marcadas = [e.categoria, ...e.extras];
+                  return (
+                    <div key={e.id} className="rounded-lg border border-line p-3">
+                      <input type="hidden" name="env_id" value={e.id} />
+                      <input type="hidden" name={`principal_${e.id}`} value={e.categoria} />
+                      <div className="grid grid-cols-2 gap-3 md:grid-cols-[1fr_110px_1.3fr_auto]">
+                        <div className="col-span-2 md:col-span-1">
+                          <label className="rotulo" htmlFor={`nome_${e.id}`}>Nome do envelope</label>
+                          <input id={`nome_${e.id}`} name={`nome_${e.id}`} defaultValue={e.nome} maxLength={40} required className="campo" />
+                        </div>
+                        <div>
+                          <label className="rotulo" htmlFor={`pct_${e.id}`}>% do recebido</label>
+                          <input id={`pct_${e.id}`} name={`pct_${e.id}`} defaultValue={fmt(e.pct)} inputMode="decimal" className="campo" />
+                        </div>
+                        <div className="col-span-2 md:col-span-1">
+                          <label className="rotulo" htmlFor={`tipo_${e.id}`}>Tipo</label>
+                          <select id={`tipo_${e.id}`} name={`tipo_${e.id}`} defaultValue={e.tipo} className="campo">
+                            {TIPOS.map((t) => <option key={t.v} value={t.v}>{t.t}</option>)}
+                          </select>
+                        </div>
+                        <div className="col-span-2 flex items-end md:col-span-1">
+                          <BotaoConfirmar
+                            formAction={excluirEnvelope} name="excluir" value={e.id}
+                            texto={`Remover o envelope "${e.nome}"? Os gastos lançados continuam salvos.`}
+                            className="botao2 py-2 text-xs text-magenta"
+                          >Remover</BotaoConfirmar>
+                        </div>
+                      </div>
+                      <fieldset className="mt-3">
+                        <legend className="rotulo">Quais gastos saem deste envelope</legend>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                          {CATS_ENV.map((cat) => (
+                            <label key={cat} className="flex items-center gap-1.5 text-sm">
+                              <input type="checkbox" name={`cats_${e.id}`} value={cat} defaultChecked={marcadas.includes(cat)} className="h-4 w-4 accent-ciano" />
+                              {cat}
+                            </label>
+                          ))}
+                        </div>
+                      </fieldset>
+                    </div>
+                  );
+                })}
               </div>
+
+              <details className="rounded-lg border border-dashed border-line p-3">
+                <summary className="cursor-pointer text-sm font-semibold text-ciano">+ Novo envelope</summary>
+                <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-[1fr_110px_1.3fr]">
+                  <div className="col-span-2 md:col-span-1">
+                    <label className="rotulo" htmlFor="nome_novo">Nome do envelope</label>
+                    <input id="nome_novo" name="nome_novo" maxLength={40} className="campo" placeholder="Ex: Reserva, Equipamentos" />
+                  </div>
+                  <div>
+                    <label className="rotulo" htmlFor="pct_novo">% do recebido</label>
+                    <input id="pct_novo" name="pct_novo" inputMode="decimal" className="campo" placeholder="0" />
+                  </div>
+                  <div className="col-span-2 md:col-span-1">
+                    <label className="rotulo" htmlFor="tipo_novo">Tipo</label>
+                    <select id="tipo_novo" name="tipo_novo" defaultValue="comum" className="campo">
+                      {TIPOS.map((t) => <option key={t.v} value={t.v}>{t.t}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <fieldset className="mt-3">
+                  <legend className="rotulo">Quais gastos saem deste envelope (cada categoria só pode ficar em um envelope)</legend>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                    {CATS_ENV.map((cat) => (
+                      <label key={cat} className="flex items-center gap-1.5 text-sm">
+                        <input type="checkbox" name="cats_novo" value={cat} className="h-4 w-4 accent-ciano" />
+                        {cat}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                <p className="mt-2 text-xs text-mute">Para usar, desmarque a categoria no envelope em que ela está hoje e marque aqui. Depois clique em Salvar assessor.</p>
+              </details>
+
               <p className={`text-sm ${Math.abs(somaPct - 100) > 0.01 ? "text-magenta" : "text-mute"}`}>
                 Soma atual: {somaPct.toLocaleString("pt-BR")}%{Math.abs(somaPct - 100) > 0.01 ? " · precisa fechar 100%" : ""}
               </p>
@@ -157,11 +242,19 @@ export default async function Config() {
                   <label className="rotulo" htmlFor="assessor_inicio">Começar a contar em</label>
                   <input id="assessor_inicio" name="assessor_inicio" type="date" defaultValue={c.assessor_inicio} className="campo" />
                 </div>
-                <div className="flex items-end"><Enviar>Salvar assessor</Enviar></div>
+                <div className="flex items-end gap-2">
+                  <Enviar>Salvar assessor</Enviar>
+                  <BotaoConfirmar
+                    formAction={restaurarSugestaoAssessor}
+                    texto="Voltar à sugestão (Material 30%, Tráfego 20%, Pró-labore 30%, Caixa 20%)? Os envelopes de hoje serão substituídos. Seus gastos continuam salvos."
+                    className="botao2 text-xs"
+                    type="submit"
+                  >Voltar à sugestão</BotaoConfirmar>
+                </div>
               </div>
             </form>
           ) : (
-            <p className="text-sm text-mute">Rode o arquivo supabase/assessor.sql no Supabase para ativar.</p>
+            <p className="text-sm text-mute">Não foi possível carregar os envelopes agora. Tente de novo em instantes.</p>
           )}
         </section>
 
