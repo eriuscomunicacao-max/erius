@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { db } from "@/lib/supabase";
 import { brl, dataBR } from "@/lib/format";
-import { getEmpresa, coresPdf, pdfTxt, desenharLogo } from "@/lib/empresa";
+import { getEmpresa, coresPdf, pdfTxt, desenharLogo, telefoneBR, rodapeInfo } from "@/lib/empresa";
 
 const PRETO_FAIXA = rgb(0.09, 0.09, 0.09);
 const PRETO = rgb(0.11, 0.11, 0.11);
@@ -143,10 +143,13 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   // Rodapé
   const fb = fp + fc;
-  page.drawLine({ start: { x: M, y: fb + mm(6) }, end: { x: W - M, y: fb + mm(6) }, thickness: 0.7, color: LINHA });
-  txt(pdfTxt(emp.nome).toUpperCase(), M, fb + mm(0.5), { size: 9, font: bold });
-  txt(emp.cnpj ? `CNPJ ${pdfTxt(emp.cnpj)}` : pdfTxt(emp.endereco), M, fb - mm(3.5), { size: 8, color: CINZA });
-  txt(pdfTxt(emp.telefone), W - M, fb + mm(0.5), { size: 9, font: bold, color: PRIM, right: true });
+  const info = rodapeInfo(emp, (t) => reg.widthOfTextAtSize(t, 8), W - 2 * M, W - 2 * M);
+  const passo = mm(3.8);
+  const yNome = fb + mm(3) + Math.max(1, info.length) * passo; // as linhas ficam acima da faixa colorida
+  page.drawLine({ start: { x: M, y: yNome + mm(5) }, end: { x: W - M, y: yNome + mm(5) }, thickness: 0.7, color: LINHA });
+  txt(pdfTxt(emp.nome).toUpperCase(), M, yNome, { size: 9, font: bold });
+  txt(telefoneBR(pdfTxt(emp.telefone)), W - M, yNome, { size: 9, font: bold, color: PRIM, right: true });
+  info.forEach((t, i) => txt(t, M, yNome - (i + 1) * passo, { size: 8, color: CINZA }));
   page.drawRectangle({ x: 0, y: fp, width: terco, height: fc, color: PRIM });
   page.drawRectangle({ x: terco, y: fp, width: terco, height: fc, color: SEC });
   page.drawRectangle({ x: 2 * terco, y: fp, width: W - 2 * terco, height: fc, color: MIX });
