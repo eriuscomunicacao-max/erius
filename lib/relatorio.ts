@@ -46,8 +46,8 @@ export async function montarRelatorio(mes: string) {
 
   // Tráfego
   const roas = ass?.roas ?? null;
-  const envTraf = ass?.envelopes.find((e) => e.categoria === "Anúncios (Ads)");
-  const envBob = ass?.envelopes.find((e) => e.categoria === "Material");
+  const envTraf = ass?.envelopes.find((e) => e.tipo === "trafego");
+ const envBob = ass?.envelopes.find((e) => e.tipo === "reposicao");
 
   // Plano pro próximo mês (regras)
   const recs: string[] = [];
