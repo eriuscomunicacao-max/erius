@@ -1,5 +1,7 @@
 import Link from "next/link";
 import Enviar from "@/components/Enviar";
+  import MetaPixel from "@/components/MetaPixel";
+  import CookiesAviso from "@/components/CookiesAviso";
 import { entrar } from "../auth-actions";
 
 export default function Login({ searchParams }: { searchParams: { erro?: string; ok?: string; convite?: string } }) {
