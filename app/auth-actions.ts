@@ -41,5 +41,5 @@ export async function criarEmpresa(fd: FormData) {
   if (!nome) erro("/onboarding", "Informe o nome da empresa.");
   const { error } = await db().rpc("criar_empresa", { p_nome: nome });
   if (error) erro("/onboarding", "Não foi possível criar a empresa.");
-  redirect("/config");
+  redirect("/onboarding/pronto");
 }
