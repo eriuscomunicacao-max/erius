@@ -9,6 +9,7 @@ import { getAssinatura } from "@/lib/assinatura";
 import { meuPapel } from "@/lib/papel";
 import { estadoDe, diasRestantes } from "@/lib/assinatura-regras";
 import BannerAssinatura from "@/components/BannerAssinatura";
+import WhatsAppFlutuante from "@/components/WhatsAppFlutuante";
 
 export const metadata: Metadata = {
   title: "OrçaGrafica",
@@ -46,6 +47,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 {emTeste && <BannerAssinatura dias={diasRestantes(ass!.trial_ate)} />}
                 {children}
               </main>
+              {papel === "dono" && <WhatsAppFlutuante empresa={emp.nome} />}
             </>
           ) : (
             children
