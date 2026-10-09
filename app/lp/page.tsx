@@ -106,6 +106,8 @@ export default function LandingPage() {
   const falar = wa("Olá! Quero saber mais sobre o OrçaGrafica.");
   return (
     <div className="bg-bg text-ink">
+              <MetaPixel evento="ViewContent" dados={{ content_name: "Landing OrçaGrafica", content_category: "landing" }} />
+        <CookiesAviso />
       {/* ---------- topo ---------- */}
       <header className="sticky top-0 z-30 border-b border-line/70 bg-bg/85 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-5 py-3">
