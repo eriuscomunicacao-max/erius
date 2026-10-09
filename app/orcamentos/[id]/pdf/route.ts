@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { db } from "@/lib/supabase";
 import { brl, dataBR } from "@/lib/format";
-import { getEmpresa, coresPdf, pdfTxt, desenharLogo } from "@/lib/empresa";
+import { getEmpresa, coresPdf, pdfTxt, desenharLogo, telefoneBR, rodapeInfo } from "@/lib/empresa";
 
 const PRETO_FAIXA = rgb(0.09, 0.09, 0.09);
 const PRETO = rgb(0.11, 0.11, 0.11);
@@ -163,11 +163,15 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   // ---------- Rodapé: espelha o cabeçalho — linha fina, texto, e faixa preta+CMYK ----------
   const faixaBaixoY = faixaPretaH + faixaCorH;
-  page.drawLine({ start: { x: M, y: faixaBaixoY + mm(6) }, end: { x: W - M, y: faixaBaixoY + mm(6) }, thickness: 0.7, color: LINHA });
-  drawText(pdfTxt(emp.nome).toUpperCase(), M, faixaBaixoY + mm(0.5), { size: 9, font: bold, color: PRETO });
-  drawText(emp.cnpj ? `CNPJ ${pdfTxt(emp.cnpj)}` : pdfTxt(emp.endereco), M, faixaBaixoY - mm(3.5), { size: 8, color: CINZA });
-  drawText(pdfTxt(emp.telefone), W - M, faixaBaixoY + mm(0.5), { size: 9, font: bold, color: PRIM, align: "right" });
-  drawText("Agradecemos a oportunidade.", W - M, faixaBaixoY - mm(3.5), { size: 8, color: CINZA, align: "right" });
+  const agradece = "Agradecemos a oportunidade.";
+  const info = rodapeInfo(emp, (t) => reg.widthOfTextAtSize(t, 8), W - 2 * M - reg.widthOfTextAtSize(agradece, 8) - mm(8), W - 2 * M);
+  const passo = mm(3.8);
+  const yNome = faixaBaixoY + mm(3) + Math.max(1, info.length) * passo; // as linhas ficam acima da faixa colorida
+  page.drawLine({ start: { x: M, y: yNome + mm(5) }, end: { x: W - M, y: yNome + mm(5) }, thickness: 0.7, color: LINHA });
+  drawText(pdfTxt(emp.nome).toUpperCase(), M, yNome, { size: 9, font: bold, color: PRETO });
+  drawText(telefoneBR(pdfTxt(emp.telefone)), W - M, yNome, { size: 9, font: bold, color: PRIM, align: "right" });
+  info.forEach((t, i) => drawText(t, M, yNome - (i + 1) * passo, { size: 8, color: CINZA }));
+  drawText(agradece, W - M, yNome - passo, { size: 8, color: CINZA, align: "right" });
 
   // faixa preta + 3 cores no rodapé (espelha o topo)
   page.drawRectangle({ x: 0, y: faixaPretaH, width: terco, height: faixaCorH, color: PRIM });
