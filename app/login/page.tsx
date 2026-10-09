@@ -8,6 +8,8 @@ export default function Login({ searchParams }: { searchParams: { erro?: string;
   const conv = /^[0-9a-f]{32,128}$/.test(searchParams.convite ?? "") ? searchParams.convite : "";
   return (
     <div className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-5">
+              <MetaPixel />
+        <CookiesAviso />
       <h1 className="font-display text-3xl font-bold">OrçaGrafica</h1>
       <p className="mb-6 mt-1 text-mute">Entre na sua conta.</p>
       {searchParams.erro && <p className="mb-3 rounded-lg border border-magenta/40 p-3 text-sm text-magenta" role="alert">{searchParams.erro}</p>}
