@@ -1,11 +1,15 @@
 import Link from "next/link";
 import Enviar from "@/components/Enviar";
+  import MetaPixel from "@/components/MetaPixel";
+  import CookiesAviso from "@/components/CookiesAviso";
 import { cadastrar } from "../auth-actions";
 
 export default function Cadastro({ searchParams }: { searchParams: { erro?: string; convite?: string } }) {
   const conv = /^[0-9a-f]{32,128}$/.test(searchParams.convite ?? "") ? searchParams.convite : "";
   return (
     <div className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-5">
+              <MetaPixel />
+        <CookiesAviso />
       <h1 className="font-display text-3xl font-bold">Criar conta</h1>
       <p className="mb-6 mt-1 text-mute">Comece a organizar orçamentos, pedidos e financeiro da sua gráfica.</p>
       {searchParams.erro && <p className="mb-3 rounded-lg border border-magenta/40 p-3 text-sm text-magenta" role="alert">{searchParams.erro}</p>}
