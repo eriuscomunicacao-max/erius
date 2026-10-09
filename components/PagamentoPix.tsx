@@ -2,10 +2,14 @@
 /* eslint-disable @next/next/no-img-element */
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { trackMeta } from "@/components/MetaPixel";
 
 export default function PagamentoPix({
-  imagem, payload, valor, vencimento, invoiceUrl,
-}: { imagem: string | null; payload: string | null; valor: string; vencimento: string; invoiceUrl: string | null }) {
+  imagem, payload, valor, vencimento, invoiceUrl, cobrancaId, valorNum, primeira,
+}: {
+  imagem: string | null; payload: string | null; valor: string; vencimento: string; invoiceUrl: string | null;
+  cobrancaId: string; valorNum: number; primeira: boolean;
+}) {
   const router = useRouter();
   const [pago, setPago] = useState(false);
   const [copiado, setCopiado] = useState(false);
@@ -27,6 +31,17 @@ export default function PagamentoPix({
     return () => clearInterval(t);
   }, [pago]);
 
+  // Compra confirmada: avisa o Meta uma única vez por cobrança (só no 1º pagamento = venda nova)
+  useEffect(() => {
+    if (!pago || !primeira) return;
+    const chave = `meta_pur_${cobrancaId}`;
+    try {
+      if (localStorage.getItem(chave) === "1") return;
+      localStorage.setItem(chave, "1");
+    } catch { /* sem storage */ }
+    trackMeta("Purchase", { value: valorNum, currency: "BRL", content_name: "Assinatura OrçaGrafica" }, cobrancaId);
+  }, [pago, primeira, cobrancaId, valorNum]);
+
   useEffect(() => {
     if (!pago) return;
     const t = setTimeout(() => { router.replace("/"); router.refresh(); }, 2500);
@@ -44,6 +59,7 @@ export default function PagamentoPix({
     }
     setCopiado(true);
     setTimeout(() => setCopiado(false), 2500);
+    if (primeira) trackMeta("AddPaymentInfo", { value: valorNum, currency: "BRL" });
   }
 
   if (pago) {
