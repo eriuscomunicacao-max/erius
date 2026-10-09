@@ -3,7 +3,7 @@ import Kpi from "@/components/Kpi";
 import { BarrasFatDesp, LinhaCaixa, Rosca, Combinado } from "@/components/Graficos";
 import { ICifrao, ICarteira, ITendencia, IPessoas, IPedido, ISeta, ICheck, IAlerta, ILampada, ICasa } from "@/components/Icones";
 import { carregar, montarDashboard } from "@/lib/data";
-import { carregarEnvelopes } from "@/lib/assessor";
+import { carregarEnvelopes, categoriasDoEnvelope } from "@/lib/assessor";
 import { mesDe } from "@/lib/format";
 import { brl, pct, mesAtual, num } from "@/lib/format";
 import { CORES } from "@/lib/constants";
@@ -17,7 +17,7 @@ export default async function Dashboard({ searchParams }: { searchParams: { mes?
   const d = montarDashboard(b, mes);
   const a = d.atual;
   // Retiradas feitas no Meu Assessor abatem do recebido
-  const catsEnv = new Set((envelopes ?? []).map((e) => e.categoria));
+  const catsEnv = new Set((envelopes ?? []).flatMap((e) => categoriasDoEnvelope(e)));
   const retiradasMes = b.gastos
     .filter((g) => catsEnv.has(g.categoria) && mesDe(g.data) === mes && g.data >= b.config.assessor_inicio)
     .reduce((t, g) => t + g.valor, 0);
