@@ -1,6 +1,8 @@
 /* eslint-disable @next/next/no-img-element */
 import type { Metadata } from "next";
 import Link from "next/link";
+  import MetaPixel from "@/components/MetaPixel";
+  import CookiesAviso from "@/components/CookiesAviso";
 
 /* ====== EDITE AQUI ====== */
 const WHATSAPP = "";            // só números com DDI+DDD, ex: "5519999999999". Vazio = esconde os botões de WhatsApp.
