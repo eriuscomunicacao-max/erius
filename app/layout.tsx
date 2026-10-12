@@ -7,6 +7,7 @@ import { getEmpresaOuNull } from "@/lib/empresa";
 import { db } from "@/lib/supabase";
 import { getAssinatura } from "@/lib/assinatura";
 import { meuPapel } from "@/lib/papel";
+import { getContexto } from "@/lib/contexto";
 import { estadoDe, diasRestantes } from "@/lib/assinatura-regras";
 import BannerAssinatura from "@/components/BannerAssinatura";
 import WhatsAppFlutuante from "@/components/WhatsAppFlutuante";
@@ -25,6 +26,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   }
   const papel = emp ? await meuPapel() : null;
   const ass = emp && papel === "dono" ? await getAssinatura() : null;
+  // dono que ainda não concluiu os primeiros passos: tela limpa, sem menu
+  const focado = emp && papel === "dono" ? (await getContexto()).ativado === false : false;
   const emTeste = ass && estadoDe(ass) === "trial";
   return (
     <html lang="pt-BR">
@@ -36,9 +39,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           rel="stylesheet"
         />
       </head>
-      <body className={emp ? "min-h-screen lg:flex" : "min-h-screen"}>
+      <body className={emp && !focado ? "min-h-screen lg:flex" : "min-h-screen"}>
         <PrivacidadeProvider>
-          {emp ? (
+          {emp && focado ? (
+            <>
+              <main>{children}</main>
+              <WhatsAppFlutuante empresa={emp.nome} />
+            </>
+          ) : emp ? (
             <>
               <Suspense fallback={<div className="lg:w-[218px]" />}>
                 <Sidebar nome={emp.nome} logoUrl={logoUrl} papel={papel} />
