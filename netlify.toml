@@ -1,0 +1,5 @@
+[[redirects]]
+  from = "/*"
+  to = "https://erius.vercel.app/:splat"
+  status = 302
+  force = true
