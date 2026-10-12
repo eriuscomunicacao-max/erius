@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
 const PUBLICAS = ["/login", "/cadastro"];
+// true = o dono só usa o sistema depois de concluir o passo a passo (/comecar). Coloque false para desligar.
+const PRIMEIROS_PASSOS_OBRIGATORIOS = true;
 
 export async function middleware(req: NextRequest) {
   // Webhook da Asaas: autenticado pelo próprio token (header), sem sessão de usuário
@@ -44,6 +46,7 @@ export async function middleware(req: NextRequest) {
     // 1 chamada traz: acesso liberado? (true/false/null=sem empresa) e papel (dono/equipe)
     const { data: ctx } = await supabase.rpc("contexto_acesso");
     const liberado = (ctx as { liberado?: boolean | null } | null)?.liberado;
+    const ativado = (ctx as { ativado?: boolean | null } | null)?.ativado;
     const papel = (ctx as { papel?: string | null } | null)?.papel;
     const ir = (destino: string) => {
       const url = req.nextUrl.clone();
@@ -55,6 +58,13 @@ export async function middleware(req: NextRequest) {
     if (papel === "equipe" && !path.startsWith("/producao") && !path.startsWith("/assinatura")) return ir("/producao");
     // Sem teste ativo nem pagamento → só a tela de assinatura
     if (liberado === false && !path.startsWith("/assinatura")) return ir("/assinatura");
+    // Dono que ainda não criou nada: só passo a passo, pagamento, logout e o PDF do 1º orçamento
+    if (PRIMEIROS_PASSOS_OBRIGATORIOS && papel === "dono" && ativado === false) {
+      const livre =
+        path.startsWith("/comecar") || path.startsWith("/assinatura") || path.startsWith("/onboarding") ||
+        /^\/orcamentos\/[^/]+\/pdf$/.test(path);
+      if (!livre) return ir("/comecar");
+    }
   }
   return res;
 }
