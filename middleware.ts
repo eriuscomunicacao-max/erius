@@ -54,6 +54,8 @@ export async function middleware(req: NextRequest) {
       url.search = "";
       return NextResponse.redirect(url);
     };
+    // Logado, mas sem empresa (parou no "Quase lá"): volta para criar a empresa
+    if (ctx && papel === null) return ir("/onboarding");
     // Funcionário: só Produção (e a tela de aviso se o acesso da empresa estiver suspenso)
     if (papel === "equipe" && !path.startsWith("/producao") && !path.startsWith("/assinatura")) return ir("/producao");
     // Sem teste ativo nem pagamento → só a tela de assinatura
