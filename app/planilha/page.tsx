@@ -1,10 +1,20 @@
 import type { Metadata } from "next";
 import { Cta, StickyCta } from "@/components/planilha/Cta";
 import PlanilhaTracking from "@/components/planilha/PlanilhaTracking";
-import CookiesAviso from "@/components/CookiesAviso";
- 
-const PRECO = "R$ 19,90";
+import CookiesPlanilha from "@/components/planilha/CookiesPlanilha";
+
+// ====== AJUSTE AQUI ======
+const PRECO_NUM = 19.9;
+const TAXA = 0.99; // taxa de serviço que o checkout da Cakto soma. Se a Cakto passar a absorver, troque por 0.
+const SUPORTE_WHATSAPP = ""; // só números com DDI, ex.: "5514999999999" (deixe vazio para não mostrar)
+const SUPORTE_EMAIL = ""; // ex.: "suporte@seudominio.com" (deixe vazio para não mostrar)
 const APP_URL = "https://orcagrafica.vercel.app/cadastro";
+// =========================
+
+const brl = (v: number) => "R$ " + v.toFixed(2).replace(".", ",");
+const PRECO = brl(PRECO_NUM);
+const TOTAL = brl(PRECO_NUM + TAXA);
+const TAXA_TXT = TAXA > 0 ? `+ ${brl(TAXA)} de taxa do checkout · total ${TOTAL}` : "";
 
 const IMG = "https://vsnmypreyzzvldbbrdiz.supabase.co/storage/v1/object/public/planilhas/";
 const img = {
@@ -34,9 +44,9 @@ const dores = [
 const blocos = [
   {
     tag: "ORÇAMENTOS",
-    titulo: "Orçamento pronto pra imprimir, sem errar o preço",
-    texto: "Escolha o produto e o valor sai sozinho, por unidade, milheiro ou m².",
-    itens: ["Calcula por m², milheiro, metro, hora ou unidade", "Itens do seu catálogo, com preço padrão", "Prazo, forma de pagamento e validade no documento", "Imprime em A4 com nome e contato da sua gráfica"],
+    titulo: "Orçamento pronto pra imprimir, com os seus preços",
+    texto: "Cadastre seus produtos e preços uma vez. Depois é só escolher o item e a planilha calcula o valor por unidade, milheiro ou m².",
+    itens: ["Funciona para produtos cobrados por m², milheiro, metro, hora ou unidade", "Itens do seu catálogo, com o preço que você definiu", "Prazo, forma de pagamento e validade no documento", "Imprime em A4 com nome e contato da sua gráfica"],
     src: img.orcamento,
     alt: "Orçamento pronto pra imprimir feito na planilha",
   },
@@ -72,17 +82,39 @@ const tudo = [
 ];
 
 const passos = [
-  { n: "1", t: "Compre e abra", d: "Receba o acesso por e-mail na hora e abra no Google Sheets, no computador ou no celular." },
-  { n: "2", t: "Cadastre seus produtos", d: "Informe o que você vende e como cobra: unidade, milheiro, m², metro ou hora." },
-  { n: "3", t: "Lance e acompanhe", d: "Registre pedidos, pagamentos e gastos. Os painéis se atualizam sozinhos." },
+  { n: "1", t: "Receba o acesso", d: "O link chega no seu e-mail logo após a confirmação do pagamento. Confira também a caixa de spam." },
+  { n: "2", t: "Faça uma cópia e explore", d: "A versão com exemplos preenchidos mostra como cada aba funciona." },
+  { n: "3", t: "Troque pelos seus dados", d: "Cadastre seus produtos e preços e lance o seu primeiro pedido." },
 ];
 
 const faq = [
+  { q: "O que eu recebo exatamente?", a: "Por e-mail, o acesso à planilha no Google Sheets: uma versão limpa pra você preencher e outra com exemplos preenchidos. Você faz uma cópia na sua conta Google e começa a editar." },
+  { q: "Tem mensalidade?", a: "Não. É uma compra única." },
+  { q: "E se o e-mail não chegar?", a: "Confira a caixa de spam e a aba Promoções. Se não encontrar, fale com o suporte informando o e-mail usado na compra." },
   { q: "Preciso instalar algum programa?", a: "Não. A planilha abre no Google Sheets (gratuito), pelo navegador, no computador ou no celular. Também abre no Excel." },
   { q: "Serve para gráfica offset e comunicação visual?", a: "Serve para os dois. Você cadastra seus próprios produtos e escolhe como cobra cada um." },
-  { q: "Como recebo a planilha?", a: "Depois do pagamento, o acesso chega no seu e-mail. Você faz uma cópia na sua conta Google e já pode usar." },
   { q: "Qual a diferença pro sistema OrçaGrafica?", a: "A planilha resolve orçamento, pedidos, cobrança, caixa e lucro. O sistema, com teste grátis de 3 dias, soma o Meu Assessor, o relatório mensal em PDF e o login de funcionário." },
 ];
+
+function Suporte({ className = "" }: { className?: string }) {
+  if (!SUPORTE_WHATSAPP && !SUPORTE_EMAIL) return null;
+  return (
+    <p className={className}>
+      Suporte:{" "}
+      {SUPORTE_WHATSAPP && (
+        <a href={`https://wa.me/${SUPORTE_WHATSAPP}`} className="text-[#33C3F2] underline">
+          WhatsApp
+        </a>
+      )}
+      {SUPORTE_WHATSAPP && SUPORTE_EMAIL && " · "}
+      {SUPORTE_EMAIL && (
+        <a href={`mailto:${SUPORTE_EMAIL}`} className="text-[#33C3F2] underline">
+          {SUPORTE_EMAIL}
+        </a>
+      )}
+    </p>
+  );
+}
 
 export default function Planilha() {
   return (
@@ -95,7 +127,7 @@ export default function Planilha() {
           <span className="font-bold text-white">
             Orça<span className="text-[#00AEEF]">Grafica</span> <span className="text-sm font-normal text-slate-400">· Planilha</span>
           </span>
-          <Cta className="!px-4 !py-2 text-sm">Baixar a planilha</Cta>
+          <Cta className="!px-4 !py-2 text-sm">Comprar por {PRECO}</Cta>
         </div>
       </header>
 
@@ -113,13 +145,15 @@ export default function Planilha() {
             Para dono de gráfica e comunicação visual. Chega de caderno, WhatsApp e planilha bagunçada: veja quanto entrou, quanto falta receber e quanto sobrou.
           </p>
           <div className="mt-7 flex flex-col items-center gap-2">
-            <Cta className="text-base">Baixar a planilha por {PRECO}</Cta>
-            <span className="text-xs text-slate-500">Acesso imediato · Abre no Google Sheets</span>
+            <Cta className="text-base">Comprar por {PRECO}</Cta>
+            <span className="text-xs text-slate-400">Pagamento único · Pix ou cartão · sem mensalidade</span>
+            {TAXA_TXT && <span className="text-xs text-slate-500">{TAXA_TXT}</span>}
+            <span className="text-xs text-slate-500">Acesso por e-mail · Abre no Google Sheets</span>
           </div>
         </div>
         <div className="relative mx-auto mt-10 max-w-4xl">
           <img src={img.hero} alt="Planilha de gestão para gráficas" className="w-full rounded-2xl border border-white/10 shadow-[0_0_80px_-20px_#00AEEF]" />
-          <p className="mt-2 text-[11px] text-slate-600">Imagem ilustrativa. Valores de exemplo.</p>
+          <p className="mt-2 text-[11px] text-slate-500">A interface acima é ilustrativa, com valores de exemplo. Você recebe a planilha editável com todas as abas e fórmulas.</p>
         </div>
       </section>
 
@@ -176,7 +210,7 @@ export default function Planilha() {
 
       {/* passos */}
       <section className="mx-auto max-w-5xl px-4 py-6">
-        <h2 className="text-center text-2xl font-bold text-white md:text-3xl">Comece em minutos</h2>
+        <h2 className="text-center text-2xl font-bold text-white md:text-3xl">Comece com exemplos prontos e adapte à sua gráfica</h2>
         <div className="mt-8 grid gap-4 md:grid-cols-3">
           {passos.map((p) => (
             <div key={p.n} className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
@@ -190,18 +224,18 @@ export default function Planilha() {
 
       {/* oferta */}
       <section className="mx-auto max-w-md px-4 py-16 text-center">
-        <h2 className="text-2xl font-bold text-white md:text-3xl">Um preço simples</h2>
+        <h2 className="text-2xl font-bold text-white md:text-3xl">Planilha completa, compra única</h2>
         <div className="mt-6 rounded-2xl border border-[#00AEEF]/40 bg-white/[0.03] p-7 shadow-[0_0_60px_-20px_#00AEEF]">
-          <div className="text-xs font-semibold tracking-wider text-[#00AEEF]">PLANILHA COMPLETA</div>
+          <div className="text-xs font-semibold tracking-wider text-[#00AEEF]">PLANILHA PARA GRÁFICA E COMUNICAÇÃO VISUAL</div>
           <div className="mt-2 text-4xl font-extrabold text-white">{PRECO}</div>
-          <div className="text-xs text-slate-500">pagamento único · Pix ou cartão</div>
-          <div className="mt-1 text-[11px] text-slate-600">O checkout soma R$ 0,99 de taxa de serviço no total.</div>
+          <div className="text-xs text-slate-400">pagamento único · Pix ou cartão · sem mensalidade</div>
+          {TAXA_TXT && <div className="mt-1 text-xs text-slate-400">{TAXA_TXT}</div>}
           <ul className="mt-5 space-y-2 text-left text-sm">
             {[
               "Planilha completa pra usar no Google Sheets",
               "Versão limpa + versão com exemplos preenchidos",
               "Orçamento, pedidos, cobrança, caixa e lucro",
-              "Acesso imediato por e-mail",
+              "Acesso por e-mail após a confirmação do pagamento",
             ].map((i) => (
               <li key={i} className="flex gap-2">
                 <span className="text-[#00AEEF]">✔</span>
@@ -209,17 +243,22 @@ export default function Planilha() {
               </li>
             ))}
           </ul>
-          <Cta className="mt-6 w-full text-base">Quero a planilha</Cta>
+          <Cta className="mt-6 w-full text-base">Quero a planilha por {PRECO}</Cta>
+          <div className="mt-4 space-y-1 border-t border-white/10 pt-4 text-xs text-slate-400">
+            <p>Direito de arrependimento de 7 dias, conforme o Código de Defesa do Consumidor.</p>
+            <p>Se o e-mail não chegar, confira o spam ou fale com o suporte.</p>
+            <Suporte />
+          </div>
         </div>
       </section>
 
       {/* app */}
       <section className="mx-auto max-w-4xl px-4 pb-16">
         <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#00AEEF]/10 to-transparent p-7 text-center">
-          <span className="text-xs font-semibold tracking-wider text-[#00AEEF]">QUER IR ALÉM DA PLANILHA?</span>
-          <h2 className="mt-2 text-2xl font-bold text-white">Conheça o sistema OrçaGrafica</h2>
+          <span className="text-xs font-semibold tracking-wider text-[#00AEEF]">DEPOIS DA PLANILHA</span>
+          <h2 className="mt-2 text-2xl font-bold text-white">Quando quiser mais, conheça o sistema OrçaGrafica</h2>
           <p className="mx-auto mt-3 max-w-xl text-sm text-slate-400">
-            Tudo da planilha, mais o Meu Assessor (envelopes do dinheiro, DAS separado e retorno dos anúncios), relatório mensal em PDF, orçamento com a sua logo e login de funcionário que não vê valores.
+            A planilha já resolve o essencial. O sistema soma o Meu Assessor (um painel que separa o dinheiro da empresa, acompanha o DAS e mostra o retorno dos anúncios), relatório mensal em PDF, orçamento com a sua logo e login de funcionário que não vê valores.
           </p>
           <a
             href={APP_URL}
@@ -244,11 +283,12 @@ export default function Planilha() {
         </div>
       </section>
 
-      <footer className="border-t border-white/10 px-4 py-8 text-center text-xs text-slate-600">
+      <footer className="border-t border-white/10 px-4 py-8 text-center text-xs text-slate-500">
+        <Suporte className="mb-2" />
         © {new Date().getFullYear()} OrçaGrafica. Imagens ilustrativas, com valores de exemplo.
       </footer>
 
-      <CookiesAviso />
+      <CookiesPlanilha />
       <StickyCta preco={PRECO} />
     </main>
   );
