@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Cta, StickyCta } from "@/components/planilha/Cta";
 import PlanilhaTracking from "@/components/planilha/PlanilhaTracking";
 import CookiesAviso from "@/components/CookiesAviso";
-
+ 
 const PRECO = "R$ 19,90";
 const APP_URL = "https://orcagrafica.vercel.app/cadastro";
 
