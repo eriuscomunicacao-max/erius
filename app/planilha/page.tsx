@@ -102,13 +102,13 @@ function Suporte({ className = "" }: { className?: string }) {
     <p className={className}>
       Suporte:{" "}
       {SUPORTE_WHATSAPP && (
-        <a href={`https://wa.me/${SUPORTE_WHATSAPP}`} className="text-[#33C3F2] underline">
+        <a href={`https://wa.me/${SUPORTE_WHATSAPP}`} className="text-[#0A86BD] underline">
           WhatsApp
         </a>
       )}
       {SUPORTE_WHATSAPP && SUPORTE_EMAIL && " · "}
       {SUPORTE_EMAIL && (
-        <a href={`mailto:${SUPORTE_EMAIL}`} className="text-[#33C3F2] underline">
+        <a href={`mailto:${SUPORTE_EMAIL}`} className="text-[#0A86BD] underline">
           {SUPORTE_EMAIL}
         </a>
       )}
@@ -118,53 +118,52 @@ function Suporte({ className = "" }: { className?: string }) {
 
 export default function Planilha() {
   return (
-    <main className="min-h-screen bg-[#070B14] pb-20 text-slate-200 md:pb-0">
+    <main className="min-h-screen bg-[#F7F9FC] pb-20 text-slate-700 md:pb-0">
       <PlanilhaTracking />
 
       {/* topo */}
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#070B14]/90 backdrop-blur">
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <span className="font-bold text-white">
-            Orça<span className="text-[#00AEEF]">Grafica</span> <span className="text-sm font-normal text-slate-400">· Planilha</span>
+          <span className="font-bold text-slate-900">
+            Orça<span className="text-[#00AEEF]">Grafica</span> <span className="text-sm font-normal text-slate-500">· Planilha</span>
           </span>
           <Cta className="!px-4 !py-2 text-sm">Comprar por {PRECO}</Cta>
         </div>
       </header>
 
       {/* hero */}
-      <section className="relative overflow-hidden px-4 pb-10 pt-14 text-center">
-        <div className="pointer-events-none absolute left-1/2 top-0 h-[420px] w-[720px] -translate-x-1/2 rounded-full bg-[#00AEEF]/15 blur-[120px]" />
-        <div className="relative mx-auto max-w-3xl">
-          <span className="rounded-full border border-[#00AEEF]/40 bg-[#00AEEF]/10 px-3 py-1 text-xs text-[#33C3F2]">
+      <section className="border-b border-slate-200 bg-white px-4 pb-12 pt-14 text-center">
+        <div className="mx-auto max-w-3xl">
+          <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">
             Planilha pronta para gráfica e comunicação visual
           </span>
-          <h1 className="mt-5 text-3xl font-extrabold leading-tight text-white md:text-5xl">
-            Orçamento, pedidos e caixa da sua gráfica <span className="text-[#00AEEF]">numa planilha só</span>
+          <h1 className="mt-5 text-3xl font-extrabold leading-tight text-slate-900 md:text-5xl">
+            Orçamento, pedidos e caixa da sua gráfica <span className="text-[#0A86BD]">numa planilha só</span>
           </h1>
-          <p className="mx-auto mt-4 max-w-xl text-slate-400">
+          <p className="mx-auto mt-4 max-w-xl text-slate-600">
             Para dono de gráfica e comunicação visual. Chega de caderno, WhatsApp e planilha bagunçada: veja quanto entrou, quanto falta receber e quanto sobrou.
           </p>
           <div className="mt-7 flex flex-col items-center gap-2">
             <Cta className="text-base">Comprar por {PRECO}</Cta>
-            <span className="text-xs text-slate-400">Pagamento único · Pix ou cartão · sem mensalidade</span>
+            <span className="text-xs text-slate-600">Pagamento único · Pix ou cartão · sem mensalidade</span>
             {TAXA_TXT && <span className="text-xs text-slate-500">{TAXA_TXT}</span>}
             <span className="text-xs text-slate-500">Acesso por e-mail · Abre no Google Sheets</span>
           </div>
         </div>
-        <div className="relative mx-auto mt-10 max-w-4xl">
-          <img src={img.hero} alt="Planilha de gestão para gráficas" className="w-full rounded-2xl border border-white/10 shadow-[0_0_80px_-20px_#00AEEF]" />
+        <div className="mx-auto mt-10 max-w-4xl">
+          <img src={img.hero} alt="Planilha de gestão para gráficas" className="w-full rounded-2xl border border-slate-200 shadow-xl" />
           <p className="mt-2 text-[11px] text-slate-500">A interface acima é ilustrativa, com valores de exemplo. Você recebe a planilha editável com todas as abas e fórmulas.</p>
         </div>
       </section>
 
       {/* dores */}
       <section className="mx-auto max-w-5xl px-4 py-14">
-        <h2 className="text-center text-2xl font-bold text-white md:text-3xl">Se a sua gráfica funciona assim, está perdendo dinheiro</h2>
+        <h2 className="text-center text-2xl font-bold text-slate-900 md:text-3xl">Se a sua gráfica funciona assim, está perdendo dinheiro</h2>
         <div className="mt-8 grid gap-4 md:grid-cols-3">
           {dores.map((d) => (
-            <div key={d.t} className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
-              <h3 className="font-semibold text-white">{d.t}</h3>
-              <p className="mt-2 text-sm text-slate-400">{d.d}</p>
+            <div key={d.t} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h3 className="font-semibold text-slate-900">{d.t}</h3>
+              <p className="mt-2 text-sm text-slate-600">{d.d}</p>
             </div>
           ))}
         </div>
@@ -172,51 +171,53 @@ export default function Planilha() {
 
       {/* blocos */}
       <section className="mx-auto max-w-6xl space-y-16 px-4 py-6">
-        <h2 className="text-center text-2xl font-bold text-white md:text-3xl">O que a planilha resolve pra você</h2>
+        <h2 className="text-center text-2xl font-bold text-slate-900 md:text-3xl">O que a planilha resolve pra você</h2>
         {blocos.map((b, i) => (
           <div key={b.tag} className={`grid items-center gap-8 md:grid-cols-2 ${i % 2 ? "md:[&>div:first-child]:order-2" : ""}`}>
             <div>
-              <span className="text-xs font-semibold tracking-wider text-[#00AEEF]">{b.tag}</span>
-              <h3 className="mt-2 text-2xl font-bold text-white">{b.titulo}</h3>
-              <p className="mt-3 text-slate-400">{b.texto}</p>
+              <span className="text-xs font-semibold tracking-wider text-[#0A86BD]">{b.tag}</span>
+              <h3 className="mt-2 text-2xl font-bold text-slate-900">{b.titulo}</h3>
+              <p className="mt-3 text-slate-600">{b.texto}</p>
               <ul className="mt-5 space-y-2">
                 {b.itens.map((it) => (
                   <li key={it} className="flex gap-2 text-sm">
-                    <span className="mt-0.5 text-[#00AEEF]">✔</span>
+                    <span className="mt-0.5 text-[#0A86BD]">✔</span>
                     {it}
                   </li>
                 ))}
               </ul>
             </div>
             <div>
-              <img src={b.src} alt={b.alt} loading="lazy" className="w-full rounded-xl border border-white/10 shadow-[0_0_60px_-25px_#00AEEF]" />
+              <img src={b.src} alt={b.alt} loading="lazy" className="w-full rounded-xl border border-slate-200 shadow-lg" />
             </div>
           </div>
         ))}
       </section>
 
       {/* tudo que vem */}
-      <section className="mx-auto max-w-5xl px-4 py-16">
-        <h2 className="text-center text-2xl font-bold text-white md:text-3xl">Tudo que vem na planilha</h2>
-        <div className="mt-8 grid gap-3 sm:grid-cols-2">
-          {tudo.map((t) => (
-            <div key={t} className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3 text-sm">
-              <span className="text-[#00AEEF]">✔</span>
-              {t}
-            </div>
-          ))}
+      <section className="mt-16 border-y border-slate-200 bg-white">
+        <div className="mx-auto max-w-5xl px-4 py-16">
+          <h2 className="text-center text-2xl font-bold text-slate-900 md:text-3xl">Tudo que vem na planilha</h2>
+          <div className="mt-8 grid gap-3 sm:grid-cols-2">
+            {tudo.map((t) => (
+              <div key={t} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                <span className="text-[#0A86BD]">✔</span>
+                {t}
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
       {/* passos */}
-      <section className="mx-auto max-w-5xl px-4 py-6">
-        <h2 className="text-center text-2xl font-bold text-white md:text-3xl">Comece com exemplos prontos e adapte à sua gráfica</h2>
+      <section className="mx-auto max-w-5xl px-4 py-14">
+        <h2 className="text-center text-2xl font-bold text-slate-900 md:text-3xl">Comece com exemplos prontos e adapte à sua gráfica</h2>
         <div className="mt-8 grid gap-4 md:grid-cols-3">
           {passos.map((p) => (
-            <div key={p.n} className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#00AEEF]/15 font-bold text-[#00AEEF]">{p.n}</div>
-              <h3 className="mt-3 font-semibold text-white">{p.t}</h3>
-              <p className="mt-1 text-sm text-slate-400">{p.d}</p>
+            <div key={p.n} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-100 font-bold text-[#0A86BD]">{p.n}</div>
+              <h3 className="mt-3 font-semibold text-slate-900">{p.t}</h3>
+              <p className="mt-1 text-sm text-slate-600">{p.d}</p>
             </div>
           ))}
         </div>
@@ -224,13 +225,13 @@ export default function Planilha() {
 
       {/* oferta */}
       <section className="mx-auto max-w-md px-4 py-16 text-center">
-        <h2 className="text-2xl font-bold text-white md:text-3xl">Planilha completa, compra única</h2>
-        <div className="mt-6 rounded-2xl border border-[#00AEEF]/40 bg-white/[0.03] p-7 shadow-[0_0_60px_-20px_#00AEEF]">
-          <div className="text-xs font-semibold tracking-wider text-[#00AEEF]">PLANILHA PARA GRÁFICA E COMUNICAÇÃO VISUAL</div>
-          <div className="mt-2 text-4xl font-extrabold text-white">{PRECO}</div>
-          <div className="text-xs text-slate-400">pagamento único · Pix ou cartão · sem mensalidade</div>
-          {TAXA_TXT && <div className="mt-1 text-xs text-slate-400">{TAXA_TXT}</div>}
-          <ul className="mt-5 space-y-2 text-left text-sm">
+        <h2 className="text-2xl font-bold text-slate-900 md:text-3xl">Planilha completa, compra única</h2>
+        <div className="mt-6 rounded-2xl border-2 border-[#00AEEF] bg-white p-7 shadow-lg">
+          <div className="text-xs font-semibold tracking-wider text-[#0A86BD]">PLANILHA PARA GRÁFICA E COMUNICAÇÃO VISUAL</div>
+          <div className="mt-2 text-4xl font-extrabold text-slate-900">{PRECO}</div>
+          <div className="text-xs text-slate-500">pagamento único · Pix ou cartão · sem mensalidade</div>
+          {TAXA_TXT && <div className="mt-1 text-xs text-slate-500">{TAXA_TXT}</div>}
+          <ul className="mt-5 space-y-2 text-left text-sm text-slate-700">
             {[
               "Planilha completa pra usar no Google Sheets",
               "Versão limpa + versão com exemplos preenchidos",
@@ -238,13 +239,13 @@ export default function Planilha() {
               "Acesso por e-mail após a confirmação do pagamento",
             ].map((i) => (
               <li key={i} className="flex gap-2">
-                <span className="text-[#00AEEF]">✔</span>
+                <span className="text-[#0A86BD]">✔</span>
                 {i}
               </li>
             ))}
           </ul>
           <Cta className="mt-6 w-full text-base">Quero a planilha por {PRECO}</Cta>
-          <div className="mt-4 space-y-1 border-t border-white/10 pt-4 text-xs text-slate-400">
+          <div className="mt-4 space-y-1 border-t border-slate-200 pt-4 text-xs text-slate-500">
             <p>Direito de arrependimento de 7 dias, conforme o Código de Defesa do Consumidor.</p>
             <p>Se o e-mail não chegar, confira o spam ou fale com o suporte.</p>
             <Suporte />
@@ -254,15 +255,15 @@ export default function Planilha() {
 
       {/* app */}
       <section className="mx-auto max-w-4xl px-4 pb-16">
-        <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#00AEEF]/10 to-transparent p-7 text-center">
-          <span className="text-xs font-semibold tracking-wider text-[#00AEEF]">DEPOIS DA PLANILHA</span>
-          <h2 className="mt-2 text-2xl font-bold text-white">Quando quiser mais, conheça o sistema OrçaGrafica</h2>
-          <p className="mx-auto mt-3 max-w-xl text-sm text-slate-400">
+        <div className="rounded-2xl border border-sky-100 bg-sky-50 p-7 text-center">
+          <span className="text-xs font-semibold tracking-wider text-[#0A86BD]">DEPOIS DA PLANILHA</span>
+          <h2 className="mt-2 text-2xl font-bold text-slate-900">Quando quiser mais, conheça o sistema OrçaGrafica</h2>
+          <p className="mx-auto mt-3 max-w-xl text-sm text-slate-600">
             A planilha já resolve o essencial. O sistema soma o Meu Assessor (um painel que separa o dinheiro da empresa, acompanha o DAS e mostra o retorno dos anúncios), relatório mensal em PDF, orçamento com a sua logo e login de funcionário que não vê valores.
           </p>
           <a
             href={APP_URL}
-            className="mt-5 inline-flex rounded-lg border border-[#00AEEF] px-5 py-2.5 text-sm font-semibold text-[#00AEEF] transition hover:bg-[#00AEEF]/10"
+            className="mt-5 inline-flex rounded-lg border border-[#0A86BD] bg-white px-5 py-2.5 text-sm font-semibold text-[#0A86BD] transition hover:bg-sky-100"
           >
             Testar o sistema 3 dias grátis
           </a>
@@ -272,18 +273,18 @@ export default function Planilha() {
 
       {/* faq */}
       <section className="mx-auto max-w-2xl px-4 pb-16">
-        <h2 className="text-center text-2xl font-bold text-white">Dúvidas frequentes</h2>
+        <h2 className="text-center text-2xl font-bold text-slate-900">Dúvidas frequentes</h2>
         <div className="mt-6 space-y-3">
           {faq.map((f) => (
-            <details key={f.q} className="group rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3">
-              <summary className="cursor-pointer list-none font-medium text-white">{f.q}</summary>
-              <p className="mt-2 text-sm text-slate-400">{f.a}</p>
+            <details key={f.q} className="group rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+              <summary className="cursor-pointer list-none font-medium text-slate-900">{f.q}</summary>
+              <p className="mt-2 text-sm text-slate-600">{f.a}</p>
             </details>
           ))}
         </div>
       </section>
 
-      <footer className="border-t border-white/10 px-4 py-8 text-center text-xs text-slate-500">
+      <footer className="border-t border-slate-200 bg-white px-4 py-8 text-center text-xs text-slate-500">
         <Suporte className="mb-2" />
         © {new Date().getFullYear()} OrçaGrafica. Imagens ilustrativas, com valores de exemplo.
       </footer>
