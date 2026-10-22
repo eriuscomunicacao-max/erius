@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
- 
+
 const PUBLICAS = ["/login", "/cadastro"];
 // true = o dono só usa o sistema depois de concluir o passo a passo (/comecar). Coloque false para desligar.
 const PRIMEIROS_PASSOS_OBRIGATORIOS = true;
@@ -26,7 +26,7 @@ export async function middleware(req: NextRequest) {
   const livre = path === "/convite" || path.startsWith("/convite/"); // convite funciona logado ou não
 
   if (livre) return res;
-  if (path === "/lp") return res; // landing de vendas: pública, logado ou não
+  if (path === "/lp" || path === "/planilha") return res; // landing de vendas: pública, logado ou não
   // visitante sem login no endereço principal vê a landing (a URL continua "/")
   if (!user && path === "/") return NextResponse.rewrite(new URL("/lp", req.url));
   if (!user && !publica) {
