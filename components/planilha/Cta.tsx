@@ -48,12 +48,23 @@ export function Cta({ children, className = "" }: { children: ReactNode; classNa
   );
 }
 
+/** Botão fixo no celular: só aparece depois que o visitante rola além do começo da página. */
 export function StickyCta({ preco }: { preco: string }) {
   const { href, onClick } = useCheckout();
+  const [ver, setVer] = useState(false);
+
+  useEffect(() => {
+    const f = () => setVer(window.scrollY > 500);
+    f();
+    window.addEventListener("scroll", f, { passive: true });
+    return () => window.removeEventListener("scroll", f);
+  }, []);
+
+  if (!ver) return null;
   return (
     <div className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-[#070B14]/95 p-3 backdrop-blur md:hidden">
       <a href={href} onClick={onClick} className="flex w-full items-center justify-center rounded-lg bg-[#00AEEF] py-3 font-semibold text-[#06101c]">
-        Baixar a planilha · {preco}
+        Comprar por {preco}
       </a>
     </div>
   );
