@@ -2,7 +2,7 @@ import "server-only";
 import { createHash } from "crypto";
 
 // Mesmo Pixel de components/MetaPixel.tsx (não dá pra importar de lá: aquele arquivo é "use client").
-export const PIXEL_ID = "1365761865397737";
+export const PIXEL_ID = "1365761865397737"; 
 const GRAPH = process.env.META_GRAPH_VERSION ?? "v23.0";
 
 const sha = (v: string) => createHash("sha256").update(v).digest("hex");
