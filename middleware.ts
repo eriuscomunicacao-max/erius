@@ -7,7 +7,7 @@ const PRIMEIROS_PASSOS_OBRIGATORIOS = true;
 
 export async function middleware(req: NextRequest) {
   // Webhook da Asaas: autenticado pelo próprio token (header), sem sessão de usuário
-  if (req.nextUrl.pathname.startsWith("/api/asaas/")) return NextResponse.next();
+  if (["/api/asaas/", "/api/webhook/", "/api/capi/"].some((p) => req.nextUrl.pathname.startsWith(p))) return NextResponse.next();
   let res = NextResponse.next({ request: req });
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     cookies: {
