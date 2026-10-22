@@ -1,4 +1,4 @@
-// Dados do produto "Planilha". Usado no navegador e no servidor (não importe nada de servidor aqui).
+// Dados do produto "Planilha". Usado no navegador e no servidor (não importe nada de servidor aqui). 
 export const PLANILHA = {
   id: "planilha-grafica",
   nome: "Planilha para Gráfica e Comunicação Visual",
