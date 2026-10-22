@@ -3,6 +3,8 @@ import { timingSafeEqual } from "crypto";
 import { enviarCapi } from "@/lib/meta-capi";
 import { adminDb } from "@/lib/supabase-admin";
 import { CLICK_RE, PLANILHA } from "@/lib/planilha-produto";
+import PlanilhaTracking from "@/components/planilha/PlanilhaTracking";
+import CookiesAviso from "@/components/CookiesAviso";
 
 export const dynamic = "force-dynamic";
 
