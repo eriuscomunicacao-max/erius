@@ -15,7 +15,7 @@ declare global {
   }
 }
 
-const consentido = () => {
+export const consentido = () => {
   if (!EXIGIR_CONSENTIMENTO) return true;
   try {
     return localStorage.getItem("cookies_marketing") === "sim";
