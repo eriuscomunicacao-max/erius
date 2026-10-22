@@ -1,4 +1,4 @@
-// Utilidades de rastreio no navegador (só chame dentro de efeitos e cliques).
+// Utilidades de rastreio no navegador (só chame dentro de efeitos e cliques). 
 export const uid = (prefixo: string) => {
   const c = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : null;
   const id = c ?? "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (ch) => {
