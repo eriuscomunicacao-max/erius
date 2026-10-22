@@ -1,5 +1,5 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect } from "react"; 
 import { useRouter } from "next/navigation";
 
 export const PIXEL_ID = "1365761865397737";
