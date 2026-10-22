@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, type ReactNode } from "react";
 import { trackMeta, consentido } from "@/components/MetaPixel";
-import { PLANILHA } from "@/lib/planilha-produto";
+import { PLANILHA } from "@/lib/planilha-produto"; 
 import { enviarCapi, getClickId, uid } from "./track";
 
 const CHECKOUT = process.env.NEXT_PUBLIC_CHECKOUT_PLANILHA ?? PLANILHA.checkout;
