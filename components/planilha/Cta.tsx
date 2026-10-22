@@ -41,7 +41,7 @@ export function Cta({ children, className = "" }: { children: ReactNode; classNa
     <a
       href={href}
       onClick={onClick}
-      className={`inline-flex items-center justify-center rounded-lg bg-[#00AEEF] px-6 py-3 font-semibold text-[#06101c] shadow-[0_0_30px_-5px_#00AEEF] transition hover:brightness-110 ${className}`}
+      className={`inline-flex items-center justify-center rounded-lg bg-[#00AEEF] px-6 py-3 font-semibold text-[#04121f] shadow-md transition hover:brightness-95 ${className}`}
     >
       {children}
     </a>
@@ -62,8 +62,8 @@ export function StickyCta({ preco }: { preco: string }) {
 
   if (!ver) return null;
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-[#070B14]/95 p-3 backdrop-blur md:hidden">
-      <a href={href} onClick={onClick} className="flex w-full items-center justify-center rounded-lg bg-[#00AEEF] py-3 font-semibold text-[#06101c]">
+    <div className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur md:hidden">
+      <a href={href} onClick={onClick} className="flex w-full items-center justify-center rounded-lg bg-[#00AEEF] py-3 font-semibold text-[#04121f]">
         Comprar por {preco}
       </a>
     </div>
