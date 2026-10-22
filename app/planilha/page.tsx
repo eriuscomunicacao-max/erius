@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Cta, StickyCta } from "@/components/planilha/Cta";
+import PlanilhaTracking from "@/components/planilha/PlanilhaTracking";
+import CookiesAviso from "@/components/CookiesAviso";
 
 const PRECO = "R$ 19,90";
 const APP_URL = "https://orcagrafica.vercel.app/cadastro";
@@ -85,6 +87,8 @@ const faq = [
 export default function Planilha() {
   return (
     <main className="min-h-screen bg-[#070B14] pb-20 text-slate-200 md:pb-0">
+      <PlanilhaTracking />
+
       {/* topo */}
       <header className="sticky top-0 z-40 border-b border-white/10 bg-[#070B14]/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
@@ -244,6 +248,7 @@ export default function Planilha() {
         © {new Date().getFullYear()} OrçaGrafica. Imagens ilustrativas, com valores de exemplo.
       </footer>
 
+      <CookiesAviso />
       <StickyCta preco={PRECO} />
     </main>
   );
