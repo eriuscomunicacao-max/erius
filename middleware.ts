@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
-
+ 
 const PUBLICAS = ["/login", "/cadastro"];
 // true = o dono só usa o sistema depois de concluir o passo a passo (/comecar). Coloque false para desligar.
 const PRIMEIROS_PASSOS_OBRIGATORIOS = true;
