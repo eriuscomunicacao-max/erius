@@ -66,10 +66,10 @@ const TEM_SUPORTE = !!(SUPORTE_WHATSAPP || SUPORTE_EMAIL);
 
 const IMG = "https://vsnmypreyzzvldbbrdiz.supabase.co/storage/v1/object/public/planilhas/";
 const img = {
-  hero: IMG + "hero.png",
+  hero: IMG + "HERO.PNG",
   orcamento: IMG + "orcamento.png",
   cobranca: IMG + "cobranca.png",
-  total: IMG + "TOtal%20a%20receber.png",
+  total: IMG + "total.png",
 };
 
 export const metadata: Metadata = {
@@ -93,11 +93,11 @@ const problemas = [
 const blocos = [
   {
     tag: "LUCRO E CAIXA",
-    titulo: "Saiba quanto realmente sobrou no mês",
-    texto: "Um painel com o que entrou, o que saiu e o que ainda falta receber. Atualiza a cada pedido, pagamento e gasto que você lança.",
-    itens: ["Faturamento, despesas, lucro e margem do mês", "Total a receber de todos os pedidos", "Caixa atual e extrato de entradas e saídas", "Comparação com o mês anterior"],
+    titulo: "Saiba quanto realmente sobrou, mês a mês",
+    texto: "Veja o que entrou, o que saiu e o lucro de cada mês, com o gráfico dos últimos 12 meses. Atualiza a cada pedido, pagamento e gasto que você lança.",
+    itens: ["Faturamento, gastos, lucro e margem de cada mês", "Gráfico dos últimos 12 meses", "Painel com caixa atual e total a receber", "Comparação com o mês anterior"],
     src: img.total,
-    alt: "Total a receber e resumo financeiro da planilha",
+    alt: "Aba Faturamento e Lucro da planilha",
   },
   {
     tag: "COBRANÇA",
