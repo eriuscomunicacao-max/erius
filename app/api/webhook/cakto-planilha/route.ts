@@ -7,11 +7,17 @@ import { CLICK_RE, PLANILHA } from "@/lib/planilha-produto";
 export const dynamic = "force-dynamic";
 
 // Cakto não assina o payload: o segredo vem DENTRO do corpo (body.secret) e é diferente em cada webhook.
+// CAKTO_SECRET_PLANILHA aceita 1 secret ou vários separados por vírgula.
 function segredoValido(recebido: string) {
-  const esperado = process.env.CAKTO_SECRET_PLANILHA ?? "";
-  if (esperado.length < 8) return false;
-  const a = Buffer.from(recebido), b = Buffer.from(esperado);
-  return a.length === b.length && timingSafeEqual(a, b);
+  const esperados = (process.env.CAKTO_SECRET_PLANILHA ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 8);
+  const a = Buffer.from(recebido);
+  return esperados.some((e) => {
+    const b = Buffer.from(e);
+    return a.length === b.length && timingSafeEqual(a, b);
+  });
 }
 
 const EVENTOS_COMPRA = ["purchase_approved"];
@@ -25,7 +31,10 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "json inválido" }, { status: 400 });
   }
-  if (!segredoValido(str(body.secret))) return NextResponse.json({ error: "não autorizado" }, { status: 401 });
+  if (!segredoValido(str(body.secret))) {
+    console.error("cakto-planilha: secret não confere (confira CAKTO_SECRET_PLANILHA e o evento de teste da Cakto)");
+    return NextResponse.json({ error: "não autorizado" }, { status: 401 });
+  }
 
   const evento = str(body.event);
   if (!EVENTOS_COMPRA.includes(evento)) return NextResponse.json({ ok: true, ignorado: evento });
@@ -51,7 +60,7 @@ export async function POST(req: NextRequest) {
     if (ja?.enviado) return NextResponse.json({ ok: true, duplicado: true });
     if (!ja) await db.from("planilha_compras").insert({ order_id: orderId, email: email || null, valor: PLANILHA.valor });
 
-    // acha o clique de origem (id pl_... vem de volta em algum campo do payload, ex.: sck/src/utm)
+    // acha o clique de origem (o id pl_... volta em data.sck / data.src)
     const m = JSON.stringify(body).match(CLICK_RE);
     let clique: { fbp?: string | null; fbc?: string | null; ip?: string | null; ua?: string | null; url?: string | null } | null = null;
     if (m) {
@@ -59,13 +68,22 @@ export async function POST(req: NextRequest) {
       clique = data ?? null;
     }
 
-    console.log("cakto-planilha", { orderId, clickIdNoPayload: !!m, cliqueEncontrado: !!clique });
+    console.log("cakto-planilha", { orderId, clickIdNoPayload: !!m, cliqueEncontrado: !!clique, fbpDaCakto: !!str(d.fbp), fbcDaCakto: !!str(d.fbc) });
 
     await enviarCapi({
       nome: "Purchase",
       eventId: orderId,
       url: clique?.url ?? `${SITE}/planilha`,
-      user: { email, phone, nome, cpf, ip: clique?.ip, ua: clique?.ua, fbp: clique?.fbp, fbc: clique?.fbc },
+      user: {
+        email,
+        phone,
+        nome,
+        cpf,
+        ip: clique?.ip,
+        ua: clique?.ua,
+        fbp: clique?.fbp ?? (str(d.fbp) || null), // reserva: o fbp que a própria Cakto enviou
+        fbc: clique?.fbc ?? (str(d.fbc) || null),
+      },
       custom: {
         value: PLANILHA.valor,
         currency: PLANILHA.moeda,
