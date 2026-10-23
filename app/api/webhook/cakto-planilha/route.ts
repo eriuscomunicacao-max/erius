@@ -8,16 +8,21 @@ export const dynamic = "force-dynamic";
 
 // Cakto não assina o payload: o segredo vem DENTRO do corpo (body.secret) e é diferente em cada webhook.
 // CAKTO_SECRET_PLANILHA aceita 1 secret ou vários separados por vírgula.
-function segredoValido(recebido: string) {
-  const esperados = (process.env.CAKTO_SECRET_PLANILHA ?? "")
+function secretsConfigurados() {
+  return (process.env.CAKTO_SECRET_PLANILHA ?? "")
     .split(",")
-    .map((s) => s.trim())
+    .map((s) => s.trim().replace(/^["']|["']$/g, ""))
     .filter((s) => s.length >= 8);
+}
+
+function conferirSecret(recebido: string) {
+  const esperados = secretsConfigurados();
   const a = Buffer.from(recebido);
-  return esperados.some((e) => {
+  const ok = esperados.some((e) => {
     const b = Buffer.from(e);
     return a.length === b.length && timingSafeEqual(a, b);
   });
+  return { ok, esperados };
 }
 
 const EVENTOS_COMPRA = ["purchase_approved"];
@@ -31,9 +36,17 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "json inválido" }, { status: 400 });
   }
-  if (!segredoValido(str(body.secret))) {
-    console.error("cakto-planilha: secret não confere (confira CAKTO_SECRET_PLANILHA e o evento de teste da Cakto)");
-    return NextResponse.json({ error: "não autorizado" }, { status: 401 });
+
+  const recebido = str(body.secret);
+  const { ok, esperados } = conferirSecret(recebido);
+  if (!ok) {
+    // TEMPORÁRIO: o campo "motivo" ajuda a achar o problema no histórico da Cakto. Remova depois que o teste passar.
+    const motivo =
+      esperados.length === 0
+        ? "A variável CAKTO_SECRET_PLANILHA não está definida (ou está vazia) neste deploy. Crie a variável na Vercel (Production) e faça um redeploy."
+        : `O secret recebido (começa com ${recebido.slice(0, 8)}, ${recebido.length} caracteres) não bate com os ${esperados.length} secret(s) configurado(s) (tamanhos: ${esperados.map((e) => e.length).join(", ")}).`;
+    console.error("cakto-planilha: 401 -", motivo);
+    return NextResponse.json({ error: "não autorizado", motivo }, { status: 401 });
   }
 
   const evento = str(body.event);
