@@ -3,18 +3,66 @@ import { Cta, StickyCta } from "@/components/planilha/Cta";
 import PlanilhaTracking from "@/components/planilha/PlanilhaTracking";
 import CookiesPlanilha from "@/components/planilha/CookiesPlanilha";
 
+// Cores de impressão (CMYK): ciano, magenta, amarelo e preto. É a linguagem de quem trabalha em gráfica.
+const CMYK = [
+  { bg: "bg-[#00AEEF]", txt: "text-[#04121f]", top: "border-t-[#00AEEF]", left: "border-l-[#00AEEF]" },
+  { bg: "bg-[#EC008C]", txt: "text-white", top: "border-t-[#EC008C]", left: "border-l-[#EC008C]" },
+  { bg: "bg-[#FFD500]", txt: "text-[#1A1A1A]", top: "border-t-[#FFD500]", left: "border-l-[#FFD500]" },
+  { bg: "bg-[#1A1A1A]", txt: "text-white", top: "border-t-[#1A1A1A]", left: "border-l-[#1A1A1A]" },
+];
+
+/** Barra de teste de cor, igual à que aparece na margem de uma impressão. */
+function CmykBar({ className = "h-1.5" }: { className?: string }) {
+  return (
+    <div className={`flex w-full ${className}`} aria-hidden="true">
+      {CMYK.map((c, i) => (
+        <span key={i} className={`flex-1 ${c.bg}`} />
+      ))}
+    </div>
+  );
+}
+
+/** Quatro bolinhas C M Y K, para o logo. */
+function CmykDots() {
+  return (
+    <span className="mr-2 inline-flex gap-0.5 align-middle" aria-hidden="true">
+      {CMYK.map((c, i) => (
+        <span key={i} className={`h-2.5 w-2.5 rounded-full ${c.bg}`} />
+      ))}
+    </span>
+  );
+}
+
+/** Marcas de corte nos cantos, como no fechamento de arquivo para a gráfica. */
+function CropMarks({ children }: { children: React.ReactNode }) {
+  const m = "absolute h-4 w-4 border-[#1A1A1A]";
+  return (
+    <div className="relative px-5 py-5">
+      <span className={`${m} left-0 top-0 border-l-2 border-t-2`} aria-hidden="true" />
+      <span className={`${m} right-0 top-0 border-r-2 border-t-2`} aria-hidden="true" />
+      <span className={`${m} bottom-0 left-0 border-b-2 border-l-2`} aria-hidden="true" />
+      <span className={`${m} bottom-0 right-0 border-b-2 border-r-2`} aria-hidden="true" />
+      {children}
+    </div>
+  );
+}
+
 // ====== AJUSTE AQUI ======
 const PRECO_NUM = 19.9;
 const TAXA = 0.99; // taxa de serviço que o checkout da Cakto soma. Se a Cakto passar a absorver, troque por 0.
-const SUPORTE_WHATSAPP = ""; // só números com DDI, ex.: "5514999999999" (deixe vazio para não mostrar)
-const SUPORTE_EMAIL = ""; // ex.: "suporte@seudominio.com" (deixe vazio para não mostrar)
+const SUPORTE_WHATSAPP = ""; // só números com DDI, ex.: "5514999999999" (vazio = não mostra)
+const SUPORTE_EMAIL = ""; // ex.: "suporte@seudominio.com" (vazio = não mostra)
+const VIDEO_URL = ""; // link de EMBED do vídeo da planilha, ex.: "https://www.youtube.com/embed/XXXX" (vazio = não mostra a seção)
 const APP_URL = "https://orcagrafica.vercel.app/cadastro";
+// Depoimentos REAIS e autorizados. Enquanto a lista estiver vazia, a seção não aparece. Não invente.
+const DEPOIMENTOS: { texto: string; nome: string; negocio: string }[] = [];
 // =========================
 
 const brl = (v: number) => "R$ " + v.toFixed(2).replace(".", ",");
 const PRECO = brl(PRECO_NUM);
 const TOTAL = brl(PRECO_NUM + TAXA);
 const TAXA_TXT = TAXA > 0 ? `+ ${brl(TAXA)} de taxa do checkout · total ${TOTAL}` : "";
+const TEM_SUPORTE = !!(SUPORTE_WHATSAPP || SUPORTE_EMAIL);
 
 const IMG = "https://vsnmypreyzzvldbbrdiz.supabase.co/storage/v1/object/public/planilhas/";
 const img = {
@@ -25,9 +73,9 @@ const img = {
 };
 
 export const metadata: Metadata = {
-  title: "Planilha para gráfica e comunicação visual | Orçamento, pedidos e caixa",
+  title: "Planilha para gráfica e comunicação visual | Orçamento, cobrança e lucro",
   description:
-    "Planilha pronta para dono de gráfica e comunicação visual: orçamento, pedidos, cobrança, caixa e lucro do mês num lugar só. Abre no Google Sheets.",
+    "Pare de perder dinheiro por orçamento errado e saldo esquecido. Planilha pronta para gráfica e comunicação visual: orçamento, pedidos, cobrança, caixa e lucro. Abre no Google Sheets.",
   openGraph: {
     title: "Planilha para gráfica e comunicação visual",
     description: "Orçamento, pedidos, cobrança, caixa e lucro do mês num lugar só.",
@@ -35,50 +83,69 @@ export const metadata: Metadata = {
   },
 };
 
-const dores = [
-  { t: "Orçamento no WhatsApp e na cabeça", d: "O cliente pergunta o preço de novo e você não lembra o que passou. Uma conta errada e o lucro some." },
-  { t: "Cliente que leva e deixa saldo", d: "Pagou o sinal, levou o banner e o resto ficou pra depois. Sem anotar, ninguém lembra quanto falta." },
-  { t: "Caixa sem saber o lucro", d: "Vendeu bastante, trabalhou o mês inteiro e no fim não sabe quanto realmente sobrou." },
+const problemas = [
+  { t: "O cliente pede o preço de novo", d: "E ninguém acha o valor que foi combinado no WhatsApp." },
+  { t: "O sinal foi pago, o saldo foi esquecido", d: "O pedido saiu da gráfica e o resto do dinheiro ficou na rua." },
+  { t: "Vende bastante, mas não sabe o lucro", d: "Entrou dinheiro, mas depois de material e despesas ninguém sabe quanto sobrou." },
+  { t: "Pedidos e prazos espalhados", d: "Recado em conversa, anotação no caderno e prazo que escapa." },
 ];
 
 const blocos = [
   {
-    tag: "ORÇAMENTOS",
-    titulo: "Orçamento pronto pra imprimir, com os seus preços",
-    texto: "Cadastre seus produtos e preços uma vez. Depois é só escolher o item e a planilha calcula o valor por unidade, milheiro ou m².",
-    itens: ["Funciona para produtos cobrados por m², milheiro, metro, hora ou unidade", "Itens do seu catálogo, com o preço que você definiu", "Prazo, forma de pagamento e validade no documento", "Imprime em A4 com nome e contato da sua gráfica"],
-    src: img.orcamento,
-    alt: "Orçamento pronto pra imprimir feito na planilha",
+    tag: "LUCRO E CAIXA",
+    titulo: "Saiba quanto realmente sobrou no mês",
+    texto: "Um painel com o que entrou, o que saiu e o que ainda falta receber. Atualiza a cada pedido, pagamento e gasto que você lança.",
+    itens: ["Faturamento, despesas, lucro e margem do mês", "Total a receber de todos os pedidos", "Caixa atual e extrato de entradas e saídas", "Comparação com o mês anterior"],
+    src: img.total,
+    alt: "Total a receber e resumo financeiro da planilha",
   },
   {
     tag: "COBRANÇA",
-    titulo: "Saiba exatamente quem ainda te deve",
-    texto: "Cada pagamento que entra abate do pedido. O que sobrou aparece numa lista, do maior saldo pro menor.",
-    itens: ["Status automático: Pago, Parcial ou Não pago", "Lista de cobrança ordenada pelo maior saldo", "Marca quando é cliente novo", "Registra sinal e saldo em linhas separadas"],
+    titulo: "Pare de esquecer dinheiro na mão do cliente",
+    texto: "Cada pagamento abate do pedido. O que sobrou aparece numa lista, do maior saldo pro menor.",
+    itens: ["Status automático: Pago, Parcial ou Não pago", "Lista de cobrança ordenada pelo maior saldo", "Sinal e saldo registrados em linhas separadas", "Marca quando é cliente novo"],
     src: img.cobranca,
     alt: "Lista de cobrança com saldos em aberto",
   },
   {
-    tag: "TOTAL A RECEBER",
-    titulo: "Veja de relance quanto ainda tem pra receber",
-    texto: "O total em aberto, o caixa do mês e o lucro, atualizados a cada pedido e pagamento que você lança.",
-    itens: ["Total a receber de todos os pedidos", "Faturamento, despesas, lucro e margem do mês", "Caixa atual e fluxo de entradas e saídas", "Comparação com o mês anterior"],
-    src: img.total,
-    alt: "Total a receber e resumo financeiro da planilha",
+    tag: "ORÇAMENTOS",
+    titulo: "Orçamento pronto pra imprimir, com os seus preços",
+    texto: "Cadastre seus produtos e preços uma vez. Depois é só escolher o item e a planilha calcula o valor por unidade, milheiro ou m².",
+    itens: ["Funciona para produtos cobrados por m², milheiro, metro, hora ou unidade", "Prazo, forma de pagamento e validade no documento", "Imprime em A4 com nome e contato da sua gráfica", "Orçamento aprovado vira pedido na própria planilha"],
+    src: img.orcamento,
+    alt: "Orçamento pronto pra imprimir feito na planilha",
   },
 ];
 
-const tudo = [
-  "Dashboard com lucro, margem e caixa",
-  "Orçamentos prontos pra imprimir",
-  "Pedidos com status de pagamento",
-  "Cobrança dos saldos em aberto",
-  "Gastos por categoria, com alerta",
-  "Fluxo de caixa com extrato",
-  "Faturamento e lucro mês a mês",
-  "Ordens de serviço com alerta de prazo",
-  "Produtos, materiais e despesas fixas",
-  "Versão com exemplos preenchidos",
+const recebe = [
+  { t: "Painel de lucro e caixa", d: "Veja faturamento, despesas, margem e saldo sem fazer conta." },
+  { t: "Orçamento por m², milheiro e unidade", d: "Menos erro de cálculo e preço sempre no mesmo critério." },
+  { t: "Cobrança dos saldos em aberto", d: "Saiba quem ainda deve e quanto, sem depender da memória." },
+  { t: "Pedidos com status de pagamento", d: "Pago, parcial ou não pago, atualizado a cada recebimento." },
+  { t: "Gastos por categoria, com alerta", d: "Descubra o que está pesando demais nas despesas do mês." },
+  { t: "Ordens de serviço com alerta de prazo", d: "Veja o que está atrasado e o que vence hoje ou amanhã." },
+  { t: "Seus produtos, materiais e despesas fixas", d: "Tudo cadastrado do seu jeito, com os seus preços." },
+  { t: "Versão limpa e versão com exemplos", d: "Aprenda com os exemplos e comece a sua do zero." },
+];
+
+const comparacao = [
+  { antes: "Preço passado de cabeça e esquecido", depois: "Orçamento calculado pelos preços que você cadastrou" },
+  { antes: "Saldo do cliente que ninguém lembra", depois: "Lista de cobrança com quem ainda deve" },
+  { antes: "Lucro descoberto no chute, no fim do mês", depois: "Lucro e margem do mês num painel" },
+  { antes: "Pedidos e prazos perdidos em conversas", depois: "Pedidos e ordens de serviço com alerta de prazo" },
+  { antes: "Caixa na cabeça", depois: "Entradas, saídas e saldo com extrato" },
+];
+
+const ePraVoce = [
+  "Tem gráfica ou empresa de comunicação visual, pequena ou média",
+  "Hoje controla no caderno, no WhatsApp ou em planilhas soltas",
+  "Quer saber saldos e lucro sem pagar mensalidade",
+  "Sabe abrir uma planilha e preencher uma tabela",
+];
+const naoEPraVoce = [
+  "Quer um sistema automático, com login de funcionário e PDF com a sua logo (isso é o sistema OrçaGrafica)",
+  "Não quer lançar pedidos, pagamentos e gastos (a planilha só mostra o que você registra)",
+  "Precisa emitir nota fiscal",
 ];
 
 const passos = [
@@ -90,14 +157,19 @@ const passos = [
 const faq = [
   { q: "O que eu recebo exatamente?", a: "Por e-mail, o acesso à planilha no Google Sheets: uma versão limpa pra você preencher e outra com exemplos preenchidos. Você faz uma cópia na sua conta Google e começa a editar." },
   { q: "Tem mensalidade?", a: "Não. É uma compra única." },
-  { q: "E se o e-mail não chegar?", a: "Confira a caixa de spam e a aba Promoções. Se não encontrar, fale com o suporte informando o e-mail usado na compra." },
-  { q: "Preciso instalar algum programa?", a: "Não. A planilha abre no Google Sheets (gratuito), pelo navegador, no computador ou no celular. Também abre no Excel." },
-  { q: "Serve para gráfica offset e comunicação visual?", a: "Serve para os dois. Você cadastra seus próprios produtos e escolhe como cobra cada um." },
-  { q: "Qual a diferença pro sistema OrçaGrafica?", a: "A planilha resolve orçamento, pedidos, cobrança, caixa e lucro. O sistema, com teste grátis de 3 dias, soma o Meu Assessor, o relatório mensal em PDF e o login de funcionário." },
+  { q: "Preciso saber usar Excel ou Google Sheets?", a: "Se você sabe digitar numa tabela, consegue usar. As células amarelas são as que você preenche, as cinzas calculam sozinhas, e a aba Comece aqui explica o passo a passo." },
+  { q: "Posso colocar meus próprios produtos e preços?", a: "Sim. Você cadastra os seus produtos, os seus preços e escolhe como cobra cada um: unidade, milheiro, m², metro, hora ou serviço." },
+  { q: "Posso editar a planilha?", a: "Sim, a cópia é sua. Só não apague as colunas cinzas, porque elas têm as fórmulas." },
+  { q: "Funciona no celular?", a: "Funciona pelo app do Google Sheets ou pelo navegador. Para lançar muita coisa de uma vez, o computador é mais confortável." },
+  { q: "Serve para gráfica offset e comunicação visual?", a: "Serve para os dois, e também para quem trabalha sozinho. Você cadastra o que vende e como cobra." },
+  { q: "Posso usar em mais de um computador?", a: "Sim. Ela fica na sua conta Google e abre em qualquer aparelho em que você entrar nela." },
+  { q: "E se o e-mail não chegar?", a: TEM_SUPORTE ? "Confira a caixa de spam e a aba Promoções. Se não encontrar, fale com o suporte informando o e-mail usado na compra." : "Confira a caixa de spam e a aba Promoções do e-mail usado na compra." },
+  ...(TEM_SUPORTE ? [{ q: "Tem suporte?", a: "Sim. Se tiver dificuldade para acessar ou usar, fale com a gente pelo contato indicado nesta página." }] : []),
+  { q: "Qual a diferença pro sistema OrçaGrafica?", a: "A planilha resolve orçamento, pedidos, cobrança, caixa e lucro. O sistema, com teste grátis de 3 dias, soma o Meu Assessor, o relatório mensal em PDF, o orçamento com a sua logo e o login de funcionário." },
 ];
 
 function Suporte({ className = "" }: { className?: string }) {
-  if (!SUPORTE_WHATSAPP && !SUPORTE_EMAIL) return null;
+  if (!TEM_SUPORTE) return null;
   return (
     <p className={className}>
       Suporte:{" "}
@@ -123,8 +195,10 @@ export default function Planilha() {
 
       {/* topo */}
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
+        <CmykBar />
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
           <span className="font-bold text-slate-900">
+            <CmykDots />
             Orça<span className="text-[#00AEEF]">Grafica</span> <span className="text-sm font-normal text-slate-500">· Planilha</span>
           </span>
           <Cta className="!px-4 !py-2 text-sm">Comprar por {PRECO}</Cta>
@@ -135,47 +209,62 @@ export default function Planilha() {
       <section className="border-b border-slate-200 bg-white px-4 pb-12 pt-14 text-center">
         <div className="mx-auto max-w-3xl">
           <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">
-            Planilha pronta para gráfica e comunicação visual
+            Planilha para gráfica e comunicação visual
           </span>
           <h1 className="mt-5 text-3xl font-extrabold leading-tight text-slate-900 md:text-5xl">
-            Orçamento, pedidos e caixa da sua gráfica <span className="text-[#0A86BD]">numa planilha só</span>
+            Pare de perder dinheiro por <span className="text-[#0A86BD]">orçamento errado</span> e cliente que não paga o saldo
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-slate-600">
-            Para dono de gráfica e comunicação visual. Chega de caderno, WhatsApp e planilha bagunçada: veja quanto entrou, quanto falta receber e quanto sobrou.
+            Orçamentos, pedidos, cobranças, caixa e lucro da sua gráfica numa planilha pronta pra usar. Sem mensalidade e sem instalar nada.
           </p>
           <div className="mt-7 flex flex-col items-center gap-2">
-            <Cta className="text-base">Comprar por {PRECO}</Cta>
+            <Cta className="w-full max-w-md text-center text-base">Quero organizar minha gráfica por {PRECO}</Cta>
             <span className="text-xs text-slate-600">Pagamento único · Pix ou cartão · sem mensalidade</span>
             {TAXA_TXT && <span className="text-xs text-slate-500">{TAXA_TXT}</span>}
-            <span className="text-xs text-slate-500">Acesso por e-mail · Abre no Google Sheets</span>
+            <span className="text-xs text-slate-500">Acesso por e-mail · Abre no Google Sheets · 7 dias de arrependimento</span>
           </div>
         </div>
         <div className="mx-auto mt-10 max-w-4xl">
-          <img src={img.hero} alt="Planilha de gestão para gráficas" className="w-full rounded-2xl border border-slate-200 shadow-xl" />
+          <CropMarks>
+            <img src={img.hero} alt="Planilha de gestão para gráficas" className="w-full rounded-lg border border-slate-200 shadow-xl" />
+          </CropMarks>
           <p className="mt-2 text-[11px] text-slate-500">A interface acima é ilustrativa, com valores de exemplo. Você recebe a planilha editável com todas as abas e fórmulas.</p>
         </div>
       </section>
+      <CmykBar className="h-2" />
 
-      {/* dores */}
+      {/* vídeo (só aparece se VIDEO_URL estiver preenchido) */}
+      {VIDEO_URL && (
+        <section className="mx-auto max-w-3xl px-4 pt-14">
+          <h2 className="text-center text-2xl font-bold text-slate-900">Veja a planilha funcionando</h2>
+          <div className="mt-6 aspect-video overflow-hidden rounded-xl border border-slate-200 shadow-lg">
+            <iframe src={VIDEO_URL} title="Planilha funcionando" className="h-full w-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; picture-in-picture" allowFullScreen />
+          </div>
+        </section>
+      )}
+
+      {/* problema */}
       <section className="mx-auto max-w-5xl px-4 py-14">
-        <h2 className="text-center text-2xl font-bold text-slate-900 md:text-3xl">Se a sua gráfica funciona assim, está perdendo dinheiro</h2>
-        <div className="mt-8 grid gap-4 md:grid-cols-3">
-          {dores.map((d) => (
-            <div key={d.t} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h3 className="font-semibold text-slate-900">{d.t}</h3>
-              <p className="mt-2 text-sm text-slate-600">{d.d}</p>
+        <h2 className="mx-auto max-w-3xl text-center text-2xl font-bold text-slate-900 md:text-3xl">
+          Se você controla sua gráfica no WhatsApp, no caderno ou em planilhas soltas, provavelmente está deixando dinheiro escapar
+        </h2>
+        <div className="mt-8 grid gap-4 sm:grid-cols-2">
+          {problemas.map((p, i) => (
+            <div key={p.t} className={`rounded-xl border border-slate-200 border-t-4 ${CMYK[i % 4].top} bg-white p-5 shadow-sm`}>
+              <h3 className="font-semibold text-slate-900">{p.t}</h3>
+              <p className="mt-2 text-sm text-slate-600">{p.d}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* blocos */}
+      {/* solução */}
       <section className="mx-auto max-w-6xl space-y-16 px-4 py-6">
-        <h2 className="text-center text-2xl font-bold text-slate-900 md:text-3xl">O que a planilha resolve pra você</h2>
+        <h2 className="text-center text-2xl font-bold text-slate-900 md:text-3xl">Uma visão simples do que está acontecendo na sua gráfica</h2>
         {blocos.map((b, i) => (
           <div key={b.tag} className={`grid items-center gap-8 md:grid-cols-2 ${i % 2 ? "md:[&>div:first-child]:order-2" : ""}`}>
             <div>
-              <span className="text-xs font-semibold tracking-wider text-[#0A86BD]">{b.tag}</span>
+              <span className={`inline-block rounded px-2 py-0.5 text-xs font-bold tracking-wider ${CMYK[i % 3].bg} ${CMYK[i % 3].txt}`}>{b.tag}</span>
               <h3 className="mt-2 text-2xl font-bold text-slate-900">{b.titulo}</h3>
               <p className="mt-3 text-slate-600">{b.texto}</p>
               <ul className="mt-5 space-y-2">
@@ -192,30 +281,100 @@ export default function Planilha() {
             </div>
           </div>
         ))}
+        <div className="text-center">
+          <Cta className="w-full max-w-md text-center text-base">Quero a planilha por {PRECO}</Cta>
+        </div>
       </section>
 
-      {/* tudo que vem */}
+      {/* o que você recebe */}
       <section className="mt-16 border-y border-slate-200 bg-white">
         <div className="mx-auto max-w-5xl px-4 py-16">
-          <h2 className="text-center text-2xl font-bold text-slate-900 md:text-3xl">Tudo que vem na planilha</h2>
-          <div className="mt-8 grid gap-3 sm:grid-cols-2">
-            {tudo.map((t) => (
-              <div key={t} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                <span className="text-[#0A86BD]">✔</span>
-                {t}
+          <h2 className="text-center text-2xl font-bold text-slate-900 md:text-3xl">O que você recebe</h2>
+          <div className="mt-8 grid gap-4 sm:grid-cols-2">
+            {recebe.map((r, i) => (
+              <div key={r.t} className={`rounded-lg border border-slate-200 border-l-4 ${CMYK[i % 4].left} bg-slate-50 p-4`}>
+                <div className="flex gap-2 font-semibold text-slate-900">
+                  <span className="text-[#0A86BD]">✔</span>
+                  {r.t}
+                </div>
+                <p className="mt-1 pl-6 text-sm text-slate-600">{r.d}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
+      {/* comparação */}
+      <section className="mx-auto max-w-4xl px-4 py-16">
+        <h2 className="text-center text-2xl font-bold text-slate-900 md:text-3xl">Caderno e WhatsApp contra a planilha</h2>
+        <div className="mt-8 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="grid grid-cols-2 text-sm font-semibold">
+            <div className="bg-red-50 px-4 py-3 text-red-700">Hoje</div>
+            <div className="bg-green-50 px-4 py-3 text-green-700">Com a planilha</div>
+          </div>
+          {comparacao.map((c) => (
+            <div key={c.antes} className="grid grid-cols-2 gap-px border-t border-slate-200 text-sm">
+              <div className="px-4 py-3 text-slate-600">✖ {c.antes}</div>
+              <div className="px-4 py-3 font-medium text-slate-800">✔ {c.depois}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* para quem é */}
+      <section className="mx-auto max-w-4xl px-4 pb-16">
+        <h2 className="text-center text-2xl font-bold text-slate-900 md:text-3xl">Para quem é (e para quem não é)</h2>
+        <p className="mt-2 text-center text-sm text-slate-500">Feita por quem vive o dia a dia de uma gráfica de comunicação visual.</p>
+        <div className="mt-8 grid gap-4 md:grid-cols-2">
+          <div className="rounded-xl border border-green-200 bg-white p-5 shadow-sm">
+            <h3 className="font-semibold text-green-700">É pra você se</h3>
+            <ul className="mt-3 space-y-2 text-sm text-slate-700">
+              {ePraVoce.map((t) => (
+                <li key={t} className="flex gap-2">
+                  <span className="text-green-600">✔</span>
+                  {t}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h3 className="font-semibold text-slate-700">Não é pra você se</h3>
+            <ul className="mt-3 space-y-2 text-sm text-slate-700">
+              {naoEPraVoce.map((t) => (
+                <li key={t} className="flex gap-2">
+                  <span className="text-slate-400">✖</span>
+                  {t}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      {/* depoimentos (só aparece quando houver depoimentos reais) */}
+      {DEPOIMENTOS.length > 0 && (
+        <section className="mx-auto max-w-5xl px-4 pb-16">
+          <h2 className="text-center text-2xl font-bold text-slate-900 md:text-3xl">Quem já usa</h2>
+          <div className="mt-8 grid gap-4 md:grid-cols-3">
+            {DEPOIMENTOS.map((d) => (
+              <figure key={d.nome} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <blockquote className="text-sm text-slate-700">“{d.texto}”</blockquote>
+                <figcaption className="mt-3 text-xs text-slate-500">
+                  <strong className="text-slate-800">{d.nome}</strong> · {d.negocio}
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* passos */}
-      <section className="mx-auto max-w-5xl px-4 py-14">
+      <section className="mx-auto max-w-5xl px-4 pb-16">
         <h2 className="text-center text-2xl font-bold text-slate-900 md:text-3xl">Comece com exemplos prontos e adapte à sua gráfica</h2>
         <div className="mt-8 grid gap-4 md:grid-cols-3">
-          {passos.map((p) => (
+          {passos.map((p, i) => (
             <div key={p.n} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-100 font-bold text-[#0A86BD]">{p.n}</div>
+              <div className={`flex h-8 w-8 items-center justify-center rounded-lg font-bold ${CMYK[i % 3].bg} ${CMYK[i % 3].txt}`}>{p.n}</div>
               <h3 className="mt-3 font-semibold text-slate-900">{p.t}</h3>
               <p className="mt-1 text-sm text-slate-600">{p.d}</p>
             </div>
@@ -224,9 +383,10 @@ export default function Planilha() {
       </section>
 
       {/* oferta */}
-      <section className="mx-auto max-w-md px-4 py-16 text-center">
+      <section className="mx-auto max-w-md px-4 pb-16 text-center">
         <h2 className="text-2xl font-bold text-slate-900 md:text-3xl">Planilha completa, compra única</h2>
-        <div className="mt-6 rounded-2xl border-2 border-[#00AEEF] bg-white p-7 shadow-lg">
+        <div className="mt-6 overflow-hidden rounded-2xl border-2 border-[#1A1A1A] bg-white p-7 shadow-lg">
+          <CmykBar className="-mx-7 -mt-7 mb-5 h-2.5" />
           <div className="text-xs font-semibold tracking-wider text-[#0A86BD]">PLANILHA PARA GRÁFICA E COMUNICAÇÃO VISUAL</div>
           <div className="mt-2 text-4xl font-extrabold text-slate-900">{PRECO}</div>
           <div className="text-xs text-slate-500">pagamento único · Pix ou cartão · sem mensalidade</div>
@@ -245,29 +405,13 @@ export default function Planilha() {
             ))}
           </ul>
           <Cta className="mt-6 w-full text-base">Quero a planilha por {PRECO}</Cta>
+          <div className="mt-5 rounded-lg border border-green-200 bg-green-50 p-3 text-left text-xs text-slate-700">
+            <strong className="text-green-700">7 dias de arrependimento.</strong> Comprou e viu que não serve pra sua gráfica? Você pode pedir o reembolso dentro de 7 dias, conforme o Código de Defesa do Consumidor.
+          </div>
           <div className="mt-4 space-y-1 border-t border-slate-200 pt-4 text-xs text-slate-500">
-            <p>Direito de arrependimento de 7 dias, conforme o Código de Defesa do Consumidor.</p>
-            <p>Se o e-mail não chegar, confira o spam ou fale com o suporte.</p>
+            <p>Se o e-mail não chegar, confira o spam{TEM_SUPORTE ? " ou fale com o suporte" : ""}.</p>
             <Suporte />
           </div>
-        </div>
-      </section>
-
-      {/* app */}
-      <section className="mx-auto max-w-4xl px-4 pb-16">
-        <div className="rounded-2xl border border-sky-100 bg-sky-50 p-7 text-center">
-          <span className="text-xs font-semibold tracking-wider text-[#0A86BD]">DEPOIS DA PLANILHA</span>
-          <h2 className="mt-2 text-2xl font-bold text-slate-900">Quando quiser mais, conheça o sistema OrçaGrafica</h2>
-          <p className="mx-auto mt-3 max-w-xl text-sm text-slate-600">
-            A planilha já resolve o essencial. O sistema soma o Meu Assessor (um painel que separa o dinheiro da empresa, acompanha o DAS e mostra o retorno dos anúncios), relatório mensal em PDF, orçamento com a sua logo e login de funcionário que não vê valores.
-          </p>
-          <a
-            href={APP_URL}
-            className="mt-5 inline-flex rounded-lg border border-[#0A86BD] bg-white px-5 py-2.5 text-sm font-semibold text-[#0A86BD] transition hover:bg-sky-100"
-          >
-            Testar o sistema 3 dias grátis
-          </a>
-          <div className="mt-2 text-xs text-slate-500">Sem cartão de crédito</div>
         </div>
       </section>
 
@@ -284,7 +428,29 @@ export default function Planilha() {
         </div>
       </section>
 
-      <footer className="border-t border-slate-200 bg-white px-4 py-8 text-center text-xs text-slate-500">
+      {/* chamada final */}
+      <section className="mx-auto max-w-3xl px-4 pb-16 text-center">
+        <div className="rounded-2xl border border-sky-100 bg-sky-50 p-8">
+          <h2 className="text-2xl font-bold text-slate-900">Pare de depender de caderno, conversas perdidas e contas feitas de cabeça.</h2>
+          <p className="mt-2 text-slate-600">Organize sua gráfica hoje.</p>
+          <Cta className="mt-5 w-full max-w-md text-center text-base">Comprar a planilha por {PRECO}</Cta>
+          {TAXA_TXT && <p className="mt-2 text-xs text-slate-500">{TAXA_TXT}</p>}
+        </div>
+      </section>
+
+      {/* sistema (secundário, depois da decisão) */}
+      <section className="mx-auto max-w-3xl px-4 pb-16 text-center">
+        <p className="text-sm text-slate-500">
+          Depois, se quiser automação, equipe e relatório em PDF, conheça o{" "}
+          <a href={APP_URL} className="font-medium text-[#0A86BD] underline">
+            sistema OrçaGrafica (3 dias grátis, sem cartão)
+          </a>
+          .
+        </p>
+      </section>
+
+      <CmykBar className="h-2" />
+      <footer className="bg-white px-4 py-8 text-center text-xs text-slate-500">
         <Suporte className="mb-2" />
         © {new Date().getFullYear()} OrçaGrafica. Imagens ilustrativas, com valores de exemplo.
       </footer>
