@@ -21,7 +21,11 @@ export const getEmpresa = cache(async (): Promise<Empresa> => {
 
 /** Mesma coisa, mas devolve null em vez de redirecionar (layout / onboarding). */
 export const getEmpresaOuNull = cache(async (): Promise<Empresa | null> => {
-  const { data } = await db().from("empresas").select("*").limit(1).maybeSingle();
+  const s = db();
+  // Visitante sem sessão (landing, login, robôs): não consulta o banco, evita "permission denied"
+  const { data: { session } } = await s.auth.getSession();
+  if (!session) return null;
+  const { data } = await s.from("empresas").select("*").limit(1).maybeSingle();
   return (data as Empresa) ?? null;
 });
 
