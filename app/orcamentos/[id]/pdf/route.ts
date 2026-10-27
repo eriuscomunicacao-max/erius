@@ -44,10 +44,10 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   const pdf = await PDFDocument.create();
   pdf.setTitle(`Proposta Comercial - ${orc.cliente}`);
-  const page = pdf.addPage([mm(210), mm(297)]);
   const W = mm(210), H = mm(297), M = mm(20);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const reg = await pdf.embedFont(StandardFonts.Helvetica);
+  let page = pdf.addPage([W, H]);
 
   const drawText = (text: string, x: number, y: number, opts: { size?: number; font?: any; color?: any; align?: "left" | "right" } = {}) => {
     const { size = 10, font = reg, color = PRETO, align = "left" } = opts;
@@ -56,19 +56,53 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     page.drawText(text, { x: xx, y, size, font, color });
   };
 
-  // Fundo branco (página nasce branca por padrão no pdf-lib, mas deixamos explícito)
-  page.drawRectangle({ x: 0, y: 0, width: W, height: H, color: BRANCO });
-
-  // ---------- Faixa superior: preta + 3 cores CMYK coladas embaixo ----------
   const faixaPretaH = mm(9);
   const faixaCorH = mm(4);
-  page.drawRectangle({ x: 0, y: H - faixaPretaH, width: W, height: faixaPretaH, color: PRETO_FAIXA });
   const terco = W / 3;
-  page.drawRectangle({ x: 0, y: H - faixaPretaH - faixaCorH, width: terco, height: faixaCorH, color: PRIM });
-  page.drawRectangle({ x: terco, y: H - faixaPretaH - faixaCorH, width: terco, height: faixaCorH, color: SEC });
-  page.drawRectangle({ x: 2 * terco, y: H - faixaPretaH - faixaCorH, width: W - 2 * terco, height: faixaCorH, color: MIX });
-
   const topoConteudo = H - faixaPretaH - faixaCorH;
+
+  // Rodapé: medidas calculadas uma vez (valem para todas as páginas)
+  const faixaBaixoY = faixaPretaH + faixaCorH;
+  const agradece = "Agradecemos a oportunidade.";
+  const info = rodapeInfo(emp, (t) => reg.widthOfTextAtSize(t, 8), W - 2 * M - reg.widthOfTextAtSize(agradece, 8) - mm(8), W - 2 * M);
+  const passo = mm(3.8);
+  const yNome = faixaBaixoY + mm(3) + Math.max(1, info.length) * passo; // as linhas ficam acima da faixa colorida
+  // Nada do conteúdo pode descer abaixo deste limite (fica acima da linha do rodapé)
+  const limiteY = yNome + mm(5) + mm(8);
+
+  // Moldura da página atual: fundo, faixas do topo e do rodapé, texto do rodapé
+  const desenharMoldura = () => {
+    page.drawRectangle({ x: 0, y: 0, width: W, height: H, color: BRANCO });
+
+    // faixa superior: preta + 3 cores CMYK coladas embaixo
+    page.drawRectangle({ x: 0, y: H - faixaPretaH, width: W, height: faixaPretaH, color: PRETO_FAIXA });
+    page.drawRectangle({ x: 0, y: H - faixaPretaH - faixaCorH, width: terco, height: faixaCorH, color: PRIM });
+    page.drawRectangle({ x: terco, y: H - faixaPretaH - faixaCorH, width: terco, height: faixaCorH, color: SEC });
+    page.drawRectangle({ x: 2 * terco, y: H - faixaPretaH - faixaCorH, width: W - 2 * terco, height: faixaCorH, color: MIX });
+
+    // rodapé: linha fina, texto e faixa preta + CMYK (espelha o topo)
+    page.drawLine({ start: { x: M, y: yNome + mm(5) }, end: { x: W - M, y: yNome + mm(5) }, thickness: 0.7, color: LINHA });
+    drawText(pdfTxt(emp.nome).toUpperCase(), M, yNome, { size: 9, font: bold, color: PRETO });
+    drawText(telefoneBR(pdfTxt(emp.telefone)), W - M, yNome, { size: 9, font: bold, color: PRIM, align: "right" });
+    info.forEach((t, i) => drawText(t, M, yNome - (i + 1) * passo, { size: 8, color: CINZA }));
+    drawText(agradece, W - M, yNome - passo, { size: 8, color: CINZA, align: "right" });
+    page.drawRectangle({ x: 0, y: faixaPretaH, width: terco, height: faixaCorH, color: PRIM });
+    page.drawRectangle({ x: terco, y: faixaPretaH, width: terco, height: faixaCorH, color: SEC });
+    page.drawRectangle({ x: 2 * terco, y: faixaPretaH, width: W - 2 * terco, height: faixaCorH, color: MIX });
+    page.drawRectangle({ x: 0, y: 0, width: W, height: faixaPretaH, color: PRETO_FAIXA });
+  };
+
+  // Começa uma nova página (só moldura) e devolve o y inicial do conteúdo
+  const novaPagina = () => {
+    page = pdf.addPage([W, H]);
+    desenharMoldura();
+    return topoConteudo - mm(14);
+  };
+
+  desenharMoldura();
+
+  // Logo da empresa (só na primeira página, canto superior direito, abaixo das faixas)
+  await desenharLogo(pdf, page, emp, { x: W - M - mm(50), y: topoConteudo - mm(5) - mm(22), w: mm(50), h: mm(22), direita: true });
 
   let y = topoConteudo - mm(18);
   drawText("PROPOSTA COMERCIAL", M, y, { size: 22, font: bold, color: PRETO });
@@ -104,18 +138,26 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     y -= mm(8);
   }
 
-  // ---------- Tabela ITEM | TAMANHO | QTD | UNITÁRIO | VALOR ----------
+  // ---------- Tabela ITEM | TAMANHO | QTD | UNITÁRIO | VALOR (quebra de página automática) ----------
   const colItem = M, colTam = M + mm(78), colQtd = M + mm(108), colUni = M + mm(138), colVal = W - M;
-  drawText("ITEM", colItem, y, { size: 8, font: bold, color: CINZA });
-  drawText("TAMANHO", colTam, y, { size: 8, font: bold, color: CINZA });
-  drawText("QTD", colQtd, y, { size: 8, font: bold, color: CINZA });
-  drawText("UNITÁRIO", colUni, y, { size: 8, font: bold, color: CINZA, align: "right" });
-  drawText("VALOR", colVal, y, { size: 8, font: bold, color: CINZA, align: "right" });
-  y -= mm(2.5);
-  page.drawLine({ start: { x: M, y }, end: { x: W - M, y }, thickness: 0.8, color: PRETO });
+  const cabecalhoTabela = () => {
+    drawText("ITEM", colItem, y, { size: 8, font: bold, color: CINZA });
+    drawText("TAMANHO", colTam, y, { size: 8, font: bold, color: CINZA });
+    drawText("QTD", colQtd, y, { size: 8, font: bold, color: CINZA });
+    drawText("UNITÁRIO", colUni, y, { size: 8, font: bold, color: CINZA, align: "right" });
+    drawText("VALOR", colVal, y, { size: 8, font: bold, color: CINZA, align: "right" });
+    y -= mm(2.5);
+    page.drawLine({ start: { x: M, y }, end: { x: W - M, y }, thickness: 0.8, color: PRETO });
+  };
+  cabecalhoTabela();
 
+  const alturaLinha = mm(9) + mm(3.5);
   for (let i = 0; i < itens.length; i++) {
     const it = itens[i];
+    if (y - alturaLinha < limiteY) {
+      y = novaPagina();
+      cabecalhoTabela();
+    }
     y -= mm(9);
     const nomeItem = it.tipo === "etiqueta" ? (it.descricao ? `Adesivo ${it.descricao}` : "Adesivo") : (it.descricao ?? it.servico);
     drawText(nomeItem, colItem, y, { size: 9.5, font: bold, color: PRETO });
@@ -129,8 +171,9 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   // ---------- Bloco VALOR TOTAL — faixa preta com barra magenta lateral ----------
   const totalGeral = itens.reduce((s2, i) => s2 + i.valor_total, 0);
-  y -= mm(9);
   const totalBlocoH = mm(13);
+  if (y - mm(9) - totalBlocoH < limiteY) y = novaPagina() + mm(9);
+  y -= mm(9);
   page.drawRectangle({ x: M, y: y - totalBlocoH, width: W - 2 * M, height: totalBlocoH, color: PRETO_FAIXA });
   page.drawRectangle({ x: M, y: y - totalBlocoH, width: mm(1.6), height: totalBlocoH, color: SEC });
   drawText("VALOR TOTAL", M + mm(6), y - mm(8.3), { size: 9.5, font: bold, color: BRANCO });
@@ -138,11 +181,6 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   y -= totalBlocoH;
 
   // ---------- Condições comerciais ----------
-  y -= mm(15);
-  drawText("CONDIÇÕES COMERCIAIS", M, y, { size: 10.5, font: bold, color: PRETO });
-  page.drawLine({ start: { x: M, y: y - mm(3) }, end: { x: M + mm(42), y: y - mm(3) }, thickness: 1.3, color: SEC });
-  y -= mm(10);
-
   const cond: [string, string][] = [
     ["Prazo de produção", orc.prazo ?? "5 dias úteis após aprovação da arte"],
     ["Forma de pagamento", orc.pagamento ?? "50% na aprovação e 50% na entrega | PIX"],
@@ -154,33 +192,20 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   }
   if (orc.observacoes) cond.push(["Observação", orc.observacoes]);
 
-  for (const [titulo, texto] of cond) {
+  const condLinhas = cond.map(([titulo, texto]) => ({ titulo, linhas: quebraTexto(reg, 8.5, texto, W - M - (M + mm(38))) }));
+  const alturaCond = mm(15) + mm(10) + condLinhas.reduce((s2, c) => s2 + c.linhas.length * mm(4.2) + mm(4), 0);
+  if (y - alturaCond < limiteY) y = novaPagina() + mm(15);
+
+  y -= mm(15);
+  drawText("CONDIÇÕES COMERCIAIS", M, y, { size: 10.5, font: bold, color: PRETO });
+  page.drawLine({ start: { x: M, y: y - mm(3) }, end: { x: M + mm(42), y: y - mm(3) }, thickness: 1.3, color: SEC });
+  y -= mm(10);
+
+  for (const { titulo, linhas } of condLinhas) {
     drawText(titulo, M, y, { size: 8.5, font: bold, color: PRETO });
-    const linhasTxt = quebraTexto(reg, 8.5, texto, W - M - (M + mm(38)));
-    linhasTxt.forEach((lt, j) => drawText(lt, M + mm(38), y - j * mm(4.2), { size: 8.5, color: CINZA }));
-    y -= linhasTxt.length * mm(4.2) + mm(4);
+    linhas.forEach((lt, j) => drawText(lt, M + mm(38), y - j * mm(4.2), { size: 8.5, color: CINZA }));
+    y -= linhas.length * mm(4.2) + mm(4);
   }
-
-  // ---------- Rodapé: espelha o cabeçalho — linha fina, texto, e faixa preta+CMYK ----------
-  const faixaBaixoY = faixaPretaH + faixaCorH;
-  const agradece = "Agradecemos a oportunidade.";
-  const info = rodapeInfo(emp, (t) => reg.widthOfTextAtSize(t, 8), W - 2 * M - reg.widthOfTextAtSize(agradece, 8) - mm(8), W - 2 * M);
-  const passo = mm(3.8);
-  const yNome = faixaBaixoY + mm(3) + Math.max(1, info.length) * passo; // as linhas ficam acima da faixa colorida
-  page.drawLine({ start: { x: M, y: yNome + mm(5) }, end: { x: W - M, y: yNome + mm(5) }, thickness: 0.7, color: LINHA });
-  drawText(pdfTxt(emp.nome).toUpperCase(), M, yNome, { size: 9, font: bold, color: PRETO });
-  drawText(telefoneBR(pdfTxt(emp.telefone)), W - M, yNome, { size: 9, font: bold, color: PRIM, align: "right" });
-  info.forEach((t, i) => drawText(t, M, yNome - (i + 1) * passo, { size: 8, color: CINZA }));
-  drawText(agradece, W - M, yNome - passo, { size: 8, color: CINZA, align: "right" });
-
-  // faixa preta + 3 cores no rodapé (espelha o topo)
-  page.drawRectangle({ x: 0, y: faixaPretaH, width: terco, height: faixaCorH, color: PRIM });
-  page.drawRectangle({ x: terco, y: faixaPretaH, width: terco, height: faixaCorH, color: SEC });
-  page.drawRectangle({ x: 2 * terco, y: faixaPretaH, width: W - 2 * terco, height: faixaCorH, color: MIX });
-  page.drawRectangle({ x: 0, y: 0, width: W, height: faixaPretaH, color: PRETO_FAIXA });
-
-  // Logo da empresa (canto superior direito, abaixo das faixas)
-  await desenharLogo(pdf, page, emp, { x: W - M - mm(50), y: topoConteudo - mm(5) - mm(22), w: mm(50), h: mm(22), direita: true });
 
   const bytes = await pdf.save();
   return new NextResponse(Buffer.from(bytes), {
