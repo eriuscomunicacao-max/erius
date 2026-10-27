@@ -191,12 +191,13 @@ export type OrcamentoItem = {
   id: string; orcamento_id: string; tipo: "etiqueta" | "manual"; servico: string;
   tamanho: string | null; quantidade: number; descricao: string | null;
   valor_unitario: number; valor_total: number; ordem: number;
+  medidas?: string | null; // lista de medidas (modo metragem total)
 };
 export type Orcamento = {
   id: string; numero: number; cliente: string; data: string; validade_dias: number;
   status: "pendente" | "aprovado" | "recusado"; prazo: string | null;
   pagamento: string | null; observacoes: string | null;
-    desconto_a_vista: number | null; bonificacao: string | null; producao_prioritaria: boolean;
+  desconto_a_vista: number | null; bonificacao: string | null; producao_prioritaria: boolean;
   urgencia_tipo?: "valor" | "percentual"; urgencia_valor?: number | null;
   mostrar_prazo?: boolean; mostrar_arte?: boolean;
 };
@@ -208,9 +209,14 @@ export async function carregarOrcamentos() {
     q<OrcamentoItem>(s.from("orcamento_itens").select("*").order("ordem")),
   ]);
   itensRaw.forEach((i) => { i.valor_unitario = n(i.valor_unitario); i.valor_total = n(i.valor_total); });
-    orcs.forEach((o) => {
+  orcs.forEach((o) => {
     o.desconto_a_vista = o.desconto_a_vista != null ? n(o.desconto_a_vista) : null;
     o.urgencia_valor = o.urgencia_valor != null ? n(o.urgencia_valor) : null;
+  });
+  const itensPorOrc = new Map<string, OrcamentoItem[]>();
+  itensRaw.forEach((i) => {
+    if (!itensPorOrc.has(i.orcamento_id)) itensPorOrc.set(i.orcamento_id, []);
+    itensPorOrc.get(i.orcamento_id)!.push(i);
   });
   return orcs.map((o) => ({ ...o, itens: itensPorOrc.get(o.id) ?? [] }));
 }
