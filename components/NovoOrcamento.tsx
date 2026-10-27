@@ -36,9 +36,26 @@ type Item = {
 };
 
 type Padroes = { prazo: string; pagamento: string; validade: number; adicional: number };
+
+// Formas de pagamento (vira o texto "Forma de pagamento" do PDF)
+const PAG_5050 = "50% na aprovação e 50% na entrega | PIX";
+const PAG_PIX = "PIX integral na aprovação";
+const PAG_BOLETO = "Boleto bancário";
+const CARTAO_RE = /^Cartão de crédito em até (\d{1,2})x$/;
+type PagTipo = "5050" | "pix" | "cartao" | "boleto" | "outro";
+function lerPagamento(t: string): { tipo: PagTipo; parcelas: string; outro: string } {
+  const v = t.trim();
+  if (!v || v === PAG_5050) return { tipo: "5050", parcelas: "3", outro: "" };
+  if (v === PAG_PIX) return { tipo: "pix", parcelas: "3", outro: "" };
+  if (v === PAG_BOLETO) return { tipo: "boleto", parcelas: "3", outro: "" };
+  const m = v.match(CARTAO_RE);
+  if (m) return { tipo: "cartao", parcelas: m[1], outro: "" };
+  return { tipo: "outro", parcelas: "3", outro: v };
+}
 type Inicial = {
   id: string; cliente: string; data: string; validade_dias: number; prazo: string | null; pagamento: string | null;
   observacoes: string | null; bonificacao: string | null; producao_prioritaria: boolean;
+  urgencia_tipo?: "valor" | "percentual"; urgencia_valor?: number | null; mostrar_prazo?: boolean; mostrar_arte?: boolean;
   itens: { tipo: string; servico: string; tamanho: string | null; quantidade: number; descricao: string | null; valor_unitario: number; valor_total: number; medidas?: string | null }[];
 };
 
@@ -81,6 +98,29 @@ export default function NovoOrcamento({ produtos, padroes, inicial }: { produtos
       };
     })
   );
+  // forma de pagamento (seleção)
+  const pagIni = lerPagamento(inicial ? inicial.pagamento ?? "" : padroes.pagamento);
+  const [pagTipo, setPagTipo] = useState<PagTipo>(pagIni.tipo);
+  const [parcelas, setParcelas] = useState(pagIni.parcelas);
+  const [pagOutro, setPagOutro] = useState(pagIni.outro);
+  const pagamentoFinal =
+    pagTipo === "5050" ? PAG_5050
+    : pagTipo === "pix" ? PAG_PIX
+    : pagTipo === "boleto" ? PAG_BOLETO
+    : pagTipo === "cartao" ? `Cartão de crédito em até ${parcelas}x`
+    : pagOutro.trim();
+
+  // taxa de urgência (produção prioritária): em % sobre o total ou em R$
+  const urgTipoIni: "valor" | "percentual" = inicial?.urgencia_tipo ?? (padroes.adicional > 0 ? "valor" : "percentual");
+  const urgValorIni = inicial?.urgencia_valor != null ? txtBR(Number(inicial.urgencia_valor)) : urgTipoIni === "valor" && padroes.adicional > 0 ? txtBR(padroes.adicional) : "";
+  const [prio, setPrio] = useState(inicial?.producao_prioritaria ?? false);
+  const [urgTipo, setUrgTipo] = useState<"valor" | "percentual">(urgTipoIni);
+  const [urgValorTxt, setUrgValorTxt] = useState(urgValorIni);
+
+  // o que aparece nas condições comerciais do PDF
+  const [mostrarPrazo, setMostrarPrazo] = useState(inicial?.mostrar_prazo ?? true);
+  const [mostrarArte, setMostrarArte] = useState(inicial?.mostrar_arte ?? true);
+
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
@@ -167,6 +207,10 @@ export default function NovoOrcamento({ produtos, padroes, inicial }: { produtos
       setCliente("");
       setItens([]);
       formRef.current?.reset();
+      const p0 = lerPagamento(padroes.pagamento);
+      setPagTipo(p0.tipo); setParcelas(p0.parcelas); setPagOutro(p0.outro);
+      setPrio(false); setUrgTipo(urgTipoIni); setUrgValorTxt(urgValorIni);
+      setMostrarPrazo(true); setMostrarArte(true);
     } catch (e: any) {
       setErro(e.message ?? "Erro ao salvar.");
     } finally {
@@ -190,19 +234,78 @@ export default function NovoOrcamento({ produtos, padroes, inicial }: { produtos
           <input id="validade_dias" name="validade_dias" defaultValue={String(inicial?.validade_dias ?? padroes.validade)} inputMode="numeric" className="campo" />
         </div>
         <div className="col-span-2">
-          <label className="rotulo" htmlFor="prazo">Prazo de produção</label>
-          <input id="prazo" name="prazo" defaultValue={inicial ? inicial.prazo ?? "" : padroes.prazo} className="campo" />
+          <div className="flex items-center justify-between gap-2">
+            <label className="rotulo" htmlFor="prazo">Prazo de produção</label>
+            <label className="flex items-center gap-1 text-[11px] text-mute">
+              <input type="checkbox" name="mostrar_prazo" checked={mostrarPrazo} onChange={(e) => setMostrarPrazo(e.target.checked)} className="h-3.5 w-3.5 accent-ciano" />
+              mostrar no PDF
+            </label>
+          </div>
+          <input id="prazo" name="prazo" defaultValue={inicial ? inicial.prazo ?? "" : padroes.prazo} className={`campo ${mostrarPrazo ? "" : "opacity-50"}`} />
         </div>
         <div className="col-span-2">
-          <label className="rotulo" htmlFor="pagamento">Forma de pagamento</label>
-          <input id="pagamento" name="pagamento" defaultValue={inicial ? inicial.pagamento ?? "" : padroes.pagamento} className="campo" />
+          <label className="rotulo" htmlFor="pagTipo">Forma de pagamento</label>
+          <div className="flex gap-2">
+            <select id="pagTipo" className="campo" value={pagTipo} onChange={(e) => setPagTipo(e.target.value as PagTipo)}>
+              <option value="5050">PIX 50% na aprovação e 50% na entrega</option>
+              <option value="pix">PIX integral</option>
+              <option value="cartao">Cartão de crédito (parcelado)</option>
+              <option value="boleto">Boleto</option>
+              <option value="outro">Outro (digitar)</option>
+            </select>
+            {pagTipo === "cartao" && (
+              <select className="campo w-28 shrink-0" value={parcelas} onChange={(e) => setParcelas(e.target.value)} aria-label="Parcelas">
+                {Array.from({ length: 12 }, (_, k) => k + 1).map((n) => <option key={n} value={String(n)}>{n}x</option>)}
+              </select>
+            )}
+          </div>
+          {pagTipo === "outro" && (
+            <input className="campo mt-2" value={pagOutro} onChange={(e) => setPagOutro(e.target.value)} placeholder="Ex: 30% na aprovação e 70% na entrega" />
+          )}
+          <input type="hidden" name="pagamento" value={pagamentoFinal} />
         </div>
-        {padroes.adicional > 0 && (
-          <label className="flex items-end gap-2 pb-2 text-sm">
-            <input type="checkbox" name="producao_prioritaria" defaultChecked={inicial ? inicial.producao_prioritaria : false} className="h-4 w-4 accent-ciano" />
-            <span>Oferecer produção prioritária (+<Valor>{brl(padroes.adicional)}</Valor>)</span>
-          </label>
-        )}
+        <div className="col-span-2 md:col-span-4">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+            <label className="flex items-center gap-2">
+              <input type="checkbox" name="producao_prioritaria" checked={prio} onChange={(e) => setPrio(e.target.checked)} className="h-4 w-4 accent-ciano" />
+              <span>Oferecer produção prioritária (taxa de urgência)</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" name="mostrar_arte" checked={mostrarArte} onChange={(e) => setMostrarArte(e.target.checked)} className="h-4 w-4 accent-ciano" />
+              <span>Mostrar &quot;Arte final&quot; (enviar arquivo) no PDF</span>
+            </label>
+          </div>
+          {prio && (
+            <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-4">
+              <div>
+                <label className="rotulo" htmlFor="urgencia_tipo">Cobrar em</label>
+                <select
+                  id="urgencia_tipo" name="urgencia_tipo" className="campo" value={urgTipo}
+                  onChange={(e) => {
+                    const t = e.target.value as "valor" | "percentual";
+                    setUrgTipo(t);
+                    setUrgValorTxt(t === "valor" && padroes.adicional > 0 ? txtBR(padroes.adicional) : "");
+                  }}
+                >
+                  <option value="percentual">Porcentagem (%) sobre o total</option>
+                  <option value="valor">Valor fixo (R$)</option>
+                </select>
+              </div>
+              <div>
+                <label className="rotulo" htmlFor="urgencia_valor">{urgTipo === "percentual" ? "Porcentagem (%)" : "Valor (R$)"}</label>
+                <input
+                  id="urgencia_valor" name="urgencia_valor" className="campo" inputMode="decimal" value={urgValorTxt}
+                  onChange={(e) => setUrgValorTxt(e.target.value)} placeholder={urgTipo === "percentual" ? "Ex: 30" : "0,00"}
+                />
+              </div>
+              {urgTipo === "percentual" && parseBR(urgValorTxt) > 0 && (
+                <div className="col-span-2 flex items-end pb-2 text-sm text-mute">
+                  <span>Acréscimo de <strong className="text-ink"><Valor>{brl(r2((total * parseBR(urgValorTxt)) / 100))}</Valor></strong> sobre <Valor>{brl(total)}</Valor></span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         <div className="col-span-2 md:col-span-2">
           <label className="rotulo" htmlFor="bonificacao">Bonificação (opcional)</label>
           <input id="bonificacao" name="bonificacao" defaultValue={inicial?.bonificacao ?? ""} className="campo" placeholder="Ex: brinde ou item extra, sem alteração no valor" />
