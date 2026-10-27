@@ -3,6 +3,7 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { db } from "@/lib/supabase";
 import { brl, dataBR } from "@/lib/format";
 import { getEmpresa, coresPdf, pdfTxt, desenharLogo, telefoneBR, rodapeInfo } from "@/lib/empresa";
+import { parseMedidas, fmtM2 } from "@/lib/medidas";
 
 const PRETO_FAIXA = rgb(0.09, 0.09, 0.09);
 const PRETO = rgb(0.11, 0.11, 0.11);
@@ -162,8 +163,10 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     const nomeItem = it.tipo === "etiqueta" ? (it.descricao ? `Adesivo ${it.descricao}` : "Adesivo") : (it.descricao ?? it.servico);
     drawText(nomeItem, colItem, y, { size: 9.5, font: bold, color: PRETO });
     drawText(it.tamanho ? (it.tipo === "etiqueta" ? `${it.tamanho} cm` : it.tamanho) : "—", colTam, y, { size: 9.5, color: CINZA });
-    drawText(`${it.quantidade} un`, colQtd, y, { size: 9.5, color: CINZA });
-    drawText(brl(it.valor_unitario), colUni, y, { size: 9.5, color: CINZA, align: "right" });
+    // item em "metragem total": uma linha só (metragem somada + preço por m²), sem listar as medidas
+    const area = it.medidas ? parseMedidas(it.medidas).areaTotal : 0;
+    drawText(it.medidas ? "—" : `${it.quantidade} un`, colQtd, y, { size: 9.5, color: CINZA });
+    drawText(it.medidas && area ? `${brl(it.valor_total / area)}/m²` : brl(it.valor_unitario), colUni, y, { size: 9.5, color: CINZA, align: "right" });
     drawText(brl(it.valor_total), colVal, y, { size: 10, font: bold, color: PRETO, align: "right" });
     y -= mm(3.5);
     page.drawLine({ start: { x: M, y }, end: { x: W - M, y }, thickness: 0.4, color: LINHA });
@@ -181,15 +184,25 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   y -= totalBlocoH;
 
   // ---------- Condições comerciais ----------
-  const cond: [string, string][] = [
-    ["Prazo de produção", orc.prazo ?? "5 dias úteis após aprovação da arte"],
-    ["Forma de pagamento", orc.pagamento ?? "50% na aprovação e 50% na entrega | PIX"],
-    ["Arte final", "Enviar em alta resolução nos formatos PDF, AI ou CDR."],
-  ];
-  if (orc.bonificacao) cond.push(["Bonificação", orc.bonificacao]);
-  if (orc.producao_prioritaria) {
-    cond.push(["Produção prioritária", adicional > 0 ? `Opcional: entrega em até 48h mediante acréscimo de ${brl(adicional)} ao valor.` : "Opcional: entrega em até 48h, consulte o acréscimo."]);
+  const pctTxt = (v: number) => `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 }).format(v)}%`;
+  const urgV = orc.urgencia_valor != null ? Number(orc.urgencia_valor) : 0;
+  let textoUrgencia = "Opcional: entrega em até 48h, consulte o acréscimo.";
+  if (orc.urgencia_tipo === "percentual" && urgV > 0) {
+    // % sobre o total fechado da proposta, já convertido em reais
+    const extra = Math.round(totalGeral * urgV) / 100;
+    textoUrgencia = `Opcional: entrega em até 48h mediante acréscimo de ${pctTxt(urgV)} sobre o valor (${brl(extra)}).`;
+  } else {
+    const fixo = urgV > 0 ? urgV : adicional;
+    if (fixo > 0) textoUrgencia = `Opcional: entrega em até 48h mediante acréscimo de ${brl(fixo)} ao valor.`;
   }
+
+  // prazo e arte final só aparecem se marcados no orçamento (clientes parceiros costumam desmarcar)
+  const cond: [string, string][] = [];
+  if (orc.mostrar_prazo !== false) cond.push(["Prazo de produção", orc.prazo ?? "5 dias úteis após aprovação da arte"]);
+  cond.push(["Forma de pagamento", orc.pagamento ?? "50% na aprovação e 50% na entrega | PIX"]);
+  if (orc.mostrar_arte !== false) cond.push(["Arte final", "Enviar em alta resolução nos formatos PDF, AI ou CDR."]);
+  if (orc.bonificacao) cond.push(["Bonificação", orc.bonificacao]);
+  if (orc.producao_prioritaria) cond.push(["Produção prioritária", textoUrgencia]);
   if (orc.observacoes) cond.push(["Observação", orc.observacoes]);
 
   const condLinhas = cond.map(([titulo, texto]) => ({ titulo, linhas: quebraTexto(reg, 8.5, texto, W - M - (M + mm(38))) }));
