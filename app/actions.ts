@@ -161,6 +161,7 @@ export async function criarOrcamento(fd: FormData) {
   const itens = JSON.parse(itensJson) as {
     tipo: "etiqueta" | "manual"; servico: string; tamanho: string | null;
     quantidade: number; descricao: string | null; valor_unitario: number; valor_total: number;
+    medidas?: string | null;
   }[];
   if (!itens.length) throw new Error("Adicione ao menos um item ao orçamento.");
 
@@ -176,6 +177,10 @@ export async function criarOrcamento(fd: FormData) {
       desconto_a_vista: fd.get("desconto_a_vista") ? valor(fd.get("desconto_a_vista")) : null,
       bonificacao: txt(fd.get("bonificacao")),
       producao_prioritaria: fd.get("producao_prioritaria") === "on",
+      urgencia_tipo: fd.get("urgencia_tipo") === "percentual" ? "percentual" : "valor",
+      urgencia_valor: fd.get("urgencia_valor") ? valor(fd.get("urgencia_valor")) : null,
+      mostrar_prazo: fd.get("mostrar_prazo") === "on",
+      mostrar_arte: fd.get("mostrar_arte") === "on",
     })
     .select("id")
     .single();
@@ -192,6 +197,7 @@ export async function criarOrcamento(fd: FormData) {
         descricao: it.descricao,
         valor_unitario: it.valor_unitario,
         valor_total: it.valor_total,
+        medidas: it.medidas?.trim() || null,
         ordem: i,
       }))
     )
@@ -327,9 +333,10 @@ export async function aprovarOrcamentoEmOS(fd: FormData) {
       it.tipo === "etiqueta"
         ? `Etiqueta ${it.tamanho ?? ""}${it.descricao ? ` ${it.descricao}` : ""}`.trim()
         : (it.descricao || it.servico);
+    const desc2 = it.medidas && it.tamanho ? `${desc} (${it.tamanho})` : desc;
     return {
       servico: it.servico || "Outros",
-      descricao: desc,
+      descricao: desc2,
       quantidade: Number(it.quantidade) || 1,
       valor_unitario: Number(it.valor_unitario) || 0,
       valor_total: Number(it.valor_total) || 0, // mantém o total exato do orçamento
@@ -472,6 +479,7 @@ export async function atualizarOrcamento(fd: FormData) {
   const itens = JSON.parse(String(fd.get("itens") ?? "[]")) as {
     tipo: "etiqueta" | "manual"; servico: string; tamanho: string | null;
     quantidade: number; descricao: string | null; valor_unitario: number; valor_total: number;
+    medidas?: string | null;
   }[];
   if (!itens.length) throw new Error("O orçamento precisa de ao menos um item.");
   await run(
@@ -484,6 +492,10 @@ export async function atualizarOrcamento(fd: FormData) {
       observacoes: txt(fd.get("observacoes")),
       bonificacao: txt(fd.get("bonificacao")),
       producao_prioritaria: fd.get("producao_prioritaria") === "on",
+      urgencia_tipo: fd.get("urgencia_tipo") === "percentual" ? "percentual" : "valor",
+      urgencia_valor: fd.get("urgencia_valor") ? valor(fd.get("urgencia_valor")) : null,
+      mostrar_prazo: fd.get("mostrar_prazo") === "on",
+      mostrar_arte: fd.get("mostrar_arte") === "on",
     }).eq("id", id)
   );
   // troca os itens: grava os novos antes de apagar os antigos (não perde nada se der erro)
@@ -492,7 +504,8 @@ export async function atualizarOrcamento(fd: FormData) {
     s.from("orcamento_itens").insert(
       itens.map((it, i) => ({
         orcamento_id: id, tipo: it.tipo, servico: it.servico, tamanho: it.tamanho, quantidade: it.quantidade,
-        descricao: it.descricao, valor_unitario: it.valor_unitario, valor_total: it.valor_total, ordem: i,
+        descricao: it.descricao, valor_unitario: it.valor_unitario, valor_total: it.valor_total,
+        medidas: it.medidas?.trim() || null, ordem: i,
       }))
     )
   );
