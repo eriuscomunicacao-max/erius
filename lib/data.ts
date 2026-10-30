@@ -7,6 +7,7 @@ export type Pedido = {
   id: string; cliente: string; servico: string; descricao: string | null; quantidade: number;
   data: string; prioridade: boolean; valor_base: number; adicional_prioridade: number;
   valor_total: number; forma_pagto: string | null; observacoes: string | null;
+  valor_envio: number; // frete repassado ao cliente: entra no que ele paga, mas NÃO no faturamento
 };
 export type Pagamento = { id: string; pedido_id: string; data: string; valor: number; forma: string | null };
 export type Gasto = {
@@ -34,7 +35,7 @@ export async function carregar() {
     q<Fixa>(s.from("despesas_fixas").select("*").order("id")),
     q<Config>(s.from("config").select("*")),
   ]);
-  pedidos.forEach((p) => { p.valor_base = n(p.valor_base); p.valor_total = n(p.valor_total); p.adicional_prioridade = n(p.adicional_prioridade); });
+  pedidos.forEach((p) => { p.valor_base = n(p.valor_base); p.valor_total = n(p.valor_total); p.adicional_prioridade = n(p.adicional_prioridade); p.valor_envio = n(p.valor_envio); });
   pagamentos.forEach((p) => (p.valor = n(p.valor)));
   gastos.forEach((g) => (g.valor = n(g.valor)));
   fixas.forEach((f) => (f.valor = n(f.valor)));
@@ -54,6 +55,9 @@ export function pagoPorPedido(pagamentos: Pagamento[]) {
   pagamentos.forEach((p) => m.set(p.pedido_id, (m.get(p.pedido_id) ?? 0) + p.valor));
   return m;
 }
+
+/** O que o cliente deve pagar no pedido: serviços (faturamento) + envio, se houver. */
+export const cobrado = (p: { valor_total: number; valor_envio?: number }) => p.valor_total + (p.valor_envio ?? 0);
 
 export function statusPedido(total: number, pago: number) {
   if (pago <= 0) return "Não pago";
@@ -117,7 +121,7 @@ export function montarDashboard(b: Base, mes: string) {
   const totalRecebido = b.pagamentos.reduce((s, p) => s + p.valor, 0);
   const totalGasto = b.gastos.reduce((s, g) => s + g.valor, 0);
   const pendentes = b.pedidos
-    .map((p) => ({ p, saldo: p.valor_total - (pagos.get(p.id) ?? 0) }))
+    .map((p) => ({ p, saldo: cobrado(p) - (pagos.get(p.id) ?? 0) }))
     .filter((x) => x.saldo > 0.005);
   const aReceber = pendentes.reduce((s, x) => s + x.saldo, 0);
   const caixaAtual = b.config.caixa_inicial + totalRecebido - totalGasto;
@@ -200,6 +204,7 @@ export type Orcamento = {
   desconto_a_vista: number | null; bonificacao: string | null; producao_prioritaria: boolean;
   urgencia_tipo?: "valor" | "percentual"; urgencia_valor?: number | null;
   mostrar_prazo?: boolean; mostrar_arte?: boolean;
+  envio?: boolean; valor_envio?: number; // envio (Correios): soma no total do cliente, não aparece no PDF
 };
 
 export async function carregarOrcamentos() {
@@ -212,6 +217,8 @@ export async function carregarOrcamentos() {
   orcs.forEach((o) => {
     o.desconto_a_vista = o.desconto_a_vista != null ? n(o.desconto_a_vista) : null;
     o.urgencia_valor = o.urgencia_valor != null ? n(o.urgencia_valor) : null;
+    o.envio = !!o.envio;
+    o.valor_envio = n(o.valor_envio);
   });
   const itensPorOrc = new Map<string, OrcamentoItem[]>();
   itensRaw.forEach((i) => {
