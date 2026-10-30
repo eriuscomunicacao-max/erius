@@ -1,5 +1,5 @@
 import "server-only";
-import { carregar, montarDashboard, carregarOS, carregarOrcamentos, pagoPorPedido } from "./data";
+import { carregar, montarDashboard, carregarOS, carregarOrcamentos, pagoPorPedido, cobrado } from "./data";
 import { carregarEnvelopes, montarAssessor } from "./assessor";
 import { brl, hoje, mesAtual, mesDe, mesLongo, somaMes, ultimoDia } from "./format";
 
@@ -30,7 +30,7 @@ export async function montarRelatorio(mes: string) {
   });
   const novos = [...primeiro.values()].filter((dt) => mesDe(dt) === mes).length;
   const pagos = pagoPorPedido(b.pagamentos);
-  const pendMes = a.ped.map((p) => p.valor_total - (pagos.get(p.id) ?? 0)).filter((s) => s > 0.005);
+  const pendMes = a.ped.map((p) => cobrado(p) - (pagos.get(p.id) ?? 0)).filter((s) => s > 0.005);
   const aReceberMes = pendMes.reduce((t, s) => t + s, 0);
 
   // Produção (OS com prazo no mês)
