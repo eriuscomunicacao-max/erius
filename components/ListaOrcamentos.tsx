@@ -8,7 +8,7 @@ const brl = (v: number) => new Intl.NumberFormat("pt-BR", { style: "currency", c
 const dataBR = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`;
 
 type Item = { id: string; tipo: string; servico: string; tamanho: string | null; quantidade: number; descricao: string | null; valor_total: number };
-type Orc = { id: string; numero: number; cliente: string; data: string; status: "pendente" | "aprovado" | "recusado"; validade_dias: number; itens: Item[] };
+type Orc = { id: string; numero: number; cliente: string; data: string; status: "pendente" | "aprovado" | "recusado"; validade_dias: number; envio?: boolean; valor_envio?: number; itens: Item[] };
 
 const corStatus: Record<string, string> = {
   pendente: "bg-amarelo/15 text-amarelo",
@@ -28,7 +28,9 @@ export default function ListaOrcamentos({ orcamentos, hoje }: { orcamentos: Orc[
   return (
     <ul className="space-y-3">
       {orcamentos.map((o) => {
-        const total = o.itens.reduce((s, i) => s + i.valor_total, 0);
+        const totalItens = o.itens.reduce((s, i) => s + i.valor_total, 0);
+        const valorEnvio = o.envio ? Number(o.valor_envio ?? 0) : 0;
+        const total = totalItens + valorEnvio; // o que o cliente paga (itens + envio)
         return (
           <li key={o.id} className="rounded-lg border border-line p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -51,6 +53,9 @@ export default function ListaOrcamentos({ orcamentos, hoje }: { orcamentos: Orc[
               </div>
               <div className="text-right">
                 <div className="font-display text-lg font-bold text-ink"><Valor>{brl(total)}</Valor></div>
+                {valorEnvio > 0 && (
+                  <div className="mt-0.5 text-xs text-mute">Itens <Valor>{brl(totalItens)}</Valor> + envio <Valor>{brl(valorEnvio)}</Valor></div>
+                )}
               </div>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
