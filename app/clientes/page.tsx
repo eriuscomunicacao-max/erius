@@ -5,7 +5,7 @@ import { paraCampo } from "@/lib/format";
 import Enviar from "@/components/Enviar";
 import FormReset from "@/components/FormReset";
 import PainelCobranca from "@/components/PainelCobranca";
-import { carregar, pagoPorPedido, statusPedido } from "@/lib/data";
+import { carregar, pagoPorPedido, statusPedido, cobrado } from "@/lib/data";
 import { brl, dataBR, hoje, mesAtual, mesDe, mesLongo, num } from "@/lib/format";
 import { SERVICOS, FORMAS } from "@/lib/constants";
 import { criarPedido, registrarPagamento, excluirPedido, excluirPagamento, atualizarPedido, atualizarPagamento } from "../actions";
@@ -24,7 +24,7 @@ export default async function Clientes({ searchParams }: { searchParams: { mes?:
   const b = await carregar();
   const pagos = pagoPorPedido(b.pagamentos);
   const doMes = b.pedidos.filter((p) => mesDe(p.data) === mes);
-  const abertos = b.pedidos.filter((p) => p.valor_total - (pagos.get(p.id) ?? 0) > 0.005);
+  const abertos = b.pedidos.filter((p) => cobrado(p) - (pagos.get(p.id) ?? 0) > 0.005);
   const nomes = [...new Set(b.pedidos.map((p) => p.cliente))].sort();
 
   // primeira compra de cada cliente (por nome, no histórico inteiro) → marca "Novo"
@@ -37,7 +37,7 @@ export default async function Clientes({ searchParams }: { searchParams: { mes?:
     .map((p) => ({
       pedido: p,
       pago: pagos.get(p.id) ?? 0,
-      saldo: p.valor_total - (pagos.get(p.id) ?? 0),
+      saldo: cobrado(p) - (pagos.get(p.id) ?? 0),
       novo: primeiraCompra.get(p.cliente.trim().toLowerCase()) === p.id,
     }))
     .sort((a, c) => c.saldo - a.saldo);
@@ -125,8 +125,8 @@ function TabelaPedidos({ lista, pagos, b }: { lista: Awaited<ReturnType<typeof c
       <tbody>
         {lista.map((p) => {
           const pago = pagos.get(p.id) ?? 0;
-          const saldo = p.valor_total - pago;
-          const st = statusPedido(p.valor_total, pago);
+          const saldo = cobrado(p) - pago;
+          const st = statusPedido(cobrado(p), pago);
           const pgs = b.pagamentos.filter((x) => x.pedido_id === p.id);
           return (
             <tr key={p.id}>
@@ -141,7 +141,10 @@ function TabelaPedidos({ lista, pagos, b }: { lista: Awaited<ReturnType<typeof c
                 {p.prioridade && <span className="ml-2 rounded bg-roxo/20 px-1.5 py-0.5 text-[11px] text-roxo">48h</span>}
               </td>
               <td className="text-right">{num(p.quantidade)}</td>
-              <td className="text-right"><Valor>{brl(p.valor_total)}</Valor></td>
+              <td className="text-right">
+                <Valor>{brl(p.valor_total)}</Valor>
+                {p.valor_envio > 0 && <div className="text-xs text-mute">+ envio <Valor>{brl(p.valor_envio)}</Valor></div>}
+              </td>
               <td className="text-right">
                 <Valor>{brl(pago)}</Valor>
                 {pgs.length > 0 && (
