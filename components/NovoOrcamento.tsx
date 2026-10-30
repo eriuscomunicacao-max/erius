@@ -56,6 +56,7 @@ type Inicial = {
   id: string; cliente: string; data: string; validade_dias: number; prazo: string | null; pagamento: string | null;
   observacoes: string | null; bonificacao: string | null; producao_prioritaria: boolean;
   urgencia_tipo?: "valor" | "percentual"; urgencia_valor?: number | null; mostrar_prazo?: boolean; mostrar_arte?: boolean;
+  envio?: boolean; valor_envio?: number | null;
   itens: { tipo: string; servico: string; tamanho: string | null; quantidade: number; descricao: string | null; valor_unitario: number; valor_total: number; medidas?: string | null }[];
 };
 
@@ -121,6 +122,10 @@ export default function NovoOrcamento({ produtos, padroes, inicial }: { produtos
   const [mostrarPrazo, setMostrarPrazo] = useState(inicial?.mostrar_prazo ?? true);
   const [mostrarArte, setMostrarArte] = useState(inicial?.mostrar_arte ?? true);
 
+  // envio pelos Correios: o valor soma no total do cliente, mas não aparece no PDF nem no faturamento
+  const [envio, setEnvio] = useState<"sim" | "nao">(inicial?.envio ? "sim" : "nao");
+  const [envioTxt, setEnvioTxt] = useState(inicial?.envio && inicial.valor_envio ? txtBR(Number(inicial.valor_envio)) : "");
+
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
@@ -151,6 +156,8 @@ export default function NovoOrcamento({ produtos, padroes, inicial }: { produtos
   }
 
   const total = itens.reduce((s, i) => s + totalDe(i), 0);
+  const valorEnvio = envio === "sim" ? Math.max(0, parseBR(envioTxt)) : 0;
+  const totalGeral = r2(total + valorEnvio);
 
   async function salvar() {
     if (!cliente.trim()) return setErro("Informe o cliente.");
@@ -166,6 +173,7 @@ export default function NovoOrcamento({ produtos, padroes, inicial }: { produtos
       if (!qtdDe(it)) return setErro("Informe a quantidade de todos os itens.");
       if (it.unidade === "m²" && (!parseBR(it.largTxt) || !parseBR(it.altTxt))) return setErro("Informe largura e altura (em metros) dos itens cobrados por m².");
     }
+    if (envio === "sim" && !(parseBR(envioTxt) > 0)) return setErro("Informe o valor do envio ou marque \"Não\".");
     setErro("");
     setSalvando(true);
     const fd = new FormData(formRef.current!);
@@ -211,6 +219,7 @@ export default function NovoOrcamento({ produtos, padroes, inicial }: { produtos
       setPagTipo(p0.tipo); setParcelas(p0.parcelas); setPagOutro(p0.outro);
       setPrio(false); setUrgTipo(urgTipoIni); setUrgValorTxt(urgValorIni);
       setMostrarPrazo(true); setMostrarArte(true);
+      setEnvio("nao"); setEnvioTxt("");
     } catch (e: any) {
       setErro(e.message ?? "Erro ao salvar.");
     } finally {
@@ -265,6 +274,28 @@ export default function NovoOrcamento({ produtos, padroes, inicial }: { produtos
           <input type="hidden" name="pagamento" value={pagamentoFinal} />
         </div>
         <div className="col-span-2 md:col-span-4">
+          <div className="rotulo">É para envio (Correios)?</div>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+            <label className="flex items-center gap-2">
+              <input type="radio" name="envio" value="nao" checked={envio === "nao"} onChange={() => setEnvio("nao")} className="h-4 w-4 accent-ciano" />
+              <span>Não</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="radio" name="envio" value="sim" checked={envio === "sim"} onChange={() => setEnvio("sim")} className="h-4 w-4 accent-ciano" />
+              <span>Sim</span>
+            </label>
+          </div>
+          {envio === "sim" && (
+            <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-4">
+              <div>
+                <label className="rotulo" htmlFor="valor_envio">Valor do envio (R$)</label>
+                <input id="valor_envio" name="valor_envio" className="campo" inputMode="decimal" value={envioTxt} onChange={(e) => setEnvioTxt(e.target.value)} placeholder="0,00" />
+              </div>
+              <p className="col-span-2 flex items-end pb-2 text-xs text-mute">Soma no total que o cliente paga. Não aparece como linha no PDF e não entra no faturamento.</p>
+            </div>
+          )}
+        </div>
+        <div className="col-span-2 md:col-span-4">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
             <label className="flex items-center gap-2">
               <input type="checkbox" name="producao_prioritaria" checked={prio} onChange={(e) => setPrio(e.target.checked)} className="h-4 w-4 accent-ciano" />
@@ -292,147 +323,4 @@ export default function NovoOrcamento({ produtos, padroes, inicial }: { produtos
                 </select>
               </div>
               <div>
-                <label className="rotulo" htmlFor="urgencia_valor">{urgTipo === "percentual" ? "Porcentagem (%)" : "Valor (R$)"}</label>
-                <input
-                  id="urgencia_valor" name="urgencia_valor" className="campo" inputMode="decimal" value={urgValorTxt}
-                  onChange={(e) => setUrgValorTxt(e.target.value)} placeholder={urgTipo === "percentual" ? "Ex: 30" : "0,00"}
-                />
-              </div>
-              {urgTipo === "percentual" && parseBR(urgValorTxt) > 0 && (
-                <div className="col-span-2 flex items-end pb-2 text-sm text-mute">
-                  <span>Acréscimo de <strong className="text-ink"><Valor>{brl(r2((total * parseBR(urgValorTxt)) / 100))}</Valor></strong> sobre <Valor>{brl(total)}</Valor></span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-        <div className="col-span-2 md:col-span-2">
-          <label className="rotulo" htmlFor="bonificacao">Bonificação (opcional)</label>
-          <input id="bonificacao" name="bonificacao" defaultValue={inicial?.bonificacao ?? ""} className="campo" placeholder="Ex: brinde ou item extra, sem alteração no valor" />
-        </div>
-        <div className="col-span-2 md:col-span-4">
-          <label className="rotulo" htmlFor="observacoes">Observações (opcional)</label>
-          <input id="observacoes" name="observacoes" defaultValue={inicial?.observacoes ?? ""} className="campo" />
-        </div>
-      </div>
-
-      <div className="rounded-lg border border-line">
-        <div className="flex items-center justify-between border-b border-line p-3">
-          <span className="text-sm font-semibold text-ink">Itens do orçamento</span>
-          <div className="flex gap-2">
-            <button type="button" onClick={() => setItens((v) => [...v, itemAvulso()])} className="botao2 py-1 text-xs">+ Adicionar item</button>
-            <button type="button" onClick={() => setItens((v) => [...v, itemLote()])} className="botao2 py-1 text-xs">+ Metragem total</button>
-          </div>
-        </div>
-        {itens.length === 0 ? (
-          <p className="p-4 text-sm text-mute">
-            Nenhum item ainda. Clique em &quot;Adicionar item&quot; e escolha um produto do seu catálogo{produtos.length === 0 && " (cadastre em Produtos e serviços)"} ou digite um item avulso.
-          </p>
-        ) : (
-          <ul className="divide-y divide-line">
-            {itens.map((it, i) => it.lote ? (
-              <li key={i} className="grid grid-cols-2 gap-2 p-3 md:grid-cols-12">
-                <div className="col-span-2 md:col-span-4">
-                  <label className="rotulo">Produto / serviço (por m²)</label>
-                  <select className="campo" value={it.produto_id ?? ""} onChange={(e) => escolherProduto(i, e.target.value)}>
-                    <option value="">Item avulso (digitar)</option>
-                    {produtos.filter((p) => p.unidade === "m²").map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
-                  </select>
-                  <div className="mt-1 text-[11px] text-mute">Metragem total · o PDF mostra uma linha só</div>
-                </div>
-                <div className="col-span-2 md:col-span-4">
-                  <label className="rotulo">{it.produto_id ? "Complemento (opcional)" : "Descrição do item"}</label>
-                  <input className="campo" value={it.descricao} onChange={(e) => mudar(i, { descricao: e.target.value })} placeholder={it.produto_id ? "Ex: fosco" : "Ex: Impressão digital · adesivo fosco"} />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="rotulo">Preço (m²) (R$)</label>
-                  <input className="campo" inputMode="decimal" value={it.precoTxt} onChange={(e) => mudar(i, { precoTxt: e.target.value })} placeholder="0,00" />
-                </div>
-                <div className="col-span-2 flex items-end justify-between gap-2 md:col-span-2">
-                  <span className="pb-2 font-display font-semibold text-ciano"><Valor>{brl(totalDe(it))}</Valor></span>
-                  <button type="button" onClick={() => setItens((v) => v.filter((_, idx) => idx !== i))} className="rounded p-1.5 text-mute hover:bg-magenta/15 hover:text-magenta" aria-label="Remover item">
-                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" /></svg>
-                  </button>
-                </div>
-                <div className="col-span-2 md:col-span-12">
-                  <label className="rotulo">Medidas em metros, uma por linha (use &quot;x2&quot; no fim para repetir; &quot;cm&quot; converte)</label>
-                  <textarea
-                    className="campo font-mono text-sm"
-                    rows={6}
-                    value={it.medidasTxt ?? ""}
-                    onChange={(e) => mudar(i, { medidasTxt: e.target.value })}
-                    placeholder={"0,45 x 0,80\n0,50 x 0,60 x2\n0,30 x 0,30 x10"}
-                  />
-                  {(() => {
-                    const m = parseMedidas(it.medidasTxt ?? "");
-                    return (
-                      <div className="mt-1 text-xs text-mute">
-                        {m.linhas} {m.linhas === 1 ? "medida" : "medidas"} · {m.pecas} {m.pecas === 1 ? "peça" : "peças"} · <strong className="text-ink">{fmtM2(m.areaTotal)} m²</strong> no total
-                        {m.invalidas.length > 0 && <span className="text-magenta"> · não entendi: {m.invalidas.slice(0, 3).join(" | ")}</span>}
-                      </div>
-                    );
-                  })()}
-                </div>
-              </li>
-            ) : (
-              <li key={i} className="grid grid-cols-2 gap-2 p-3 md:grid-cols-12">
-                <div className="col-span-2 md:col-span-4">
-                  <label className="rotulo">Produto / serviço</label>
-                  <select className="campo" value={it.produto_id ?? ""} onChange={(e) => escolherProduto(i, e.target.value)}>
-                    <option value="">Item avulso (digitar)</option>
-                    {produtos.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
-                  </select>
-                  {it.produto_id && <div className="mt-1 text-[11px] text-mute">Cobrado {rotuloUnidade(it.unidade)}</div>}
-                </div>
-                <div className="col-span-2 md:col-span-3">
-                  <label className="rotulo">{it.produto_id ? "Complemento (opcional)" : "Descrição do item"}</label>
-                  <input className="campo" value={it.descricao} onChange={(e) => mudar(i, { descricao: e.target.value })} placeholder={it.produto_id ? "Ex: fosco, 4x4 cores" : "O que é o item"} />
-                </div>
-                {it.unidade === "m²" && (
-                  <>
-                    <div className="md:col-span-1">
-                      <label className="rotulo">Larg. (m)</label>
-                      <input className="campo" inputMode="decimal" value={it.largTxt} onChange={(e) => mudar(i, { largTxt: e.target.value })} placeholder="1,00" />
-                    </div>
-                    <div className="md:col-span-1">
-                      <label className="rotulo">Alt. (m)</label>
-                      <input className="campo" inputMode="decimal" value={it.altTxt} onChange={(e) => mudar(i, { altTxt: e.target.value })} placeholder="2,00" />
-                    </div>
-                  </>
-                )}
-                <div className="md:col-span-1">
-                  <label className="rotulo">Qtd</label>
-                  <input className="campo" inputMode="decimal" value={it.qtdTxt} onChange={(e) => mudar(i, { qtdTxt: e.target.value })} />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="rotulo">Preço {it.unidade !== "un" ? `(${it.unidade})` : ""} (R$)</label>
-                  <input className="campo" inputMode="decimal" value={it.precoTxt} onChange={(e) => mudar(i, { precoTxt: e.target.value })} placeholder="0,00" />
-                </div>
-                <div className="col-span-2 flex items-end justify-between gap-2 md:col-span-1">
-                  <span className="pb-2 font-display font-semibold text-ciano"><Valor>{brl(totalDe(it))}</Valor></span>
-                  <button type="button" onClick={() => setItens((v) => v.filter((_, idx) => idx !== i))} className="rounded p-1.5 text-mute hover:bg-magenta/15 hover:text-magenta" aria-label="Remover item">
-                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" /></svg>
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-        {itens.length > 0 && (
-          <div className="flex items-center justify-between border-t border-line p-3">
-            <span className="text-sm text-mute">Total do orçamento</span>
-            <span className="font-display text-lg font-bold text-ink"><Valor>{brl(total)}</Valor></span>
-          </div>
-        )}
-      </div>
-
-      {erro && <p className="text-sm text-magenta" role="alert">{erro}</p>}
-      <div className="flex gap-2">
-        <button type="submit" disabled={salvando} className="botao disabled:opacity-60">
-          {salvando ? "Salvando..." : editando ? "Salvar alterações" : "Salvar orçamento"}
-        </button>
-        {editando && <a href="/orcamentos" className="botao2">Cancelar</a>}
-      </div>
-    </form>
-  );
-}
+                <label className="rotulo" htmlFor="urgencia_valor">{urgTipo === "percentual" ? "Porcentagem (%)" :
