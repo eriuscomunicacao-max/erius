@@ -31,6 +31,9 @@ function quebraTexto(font: any, size: number, texto: string, larguraMax: number)
   return linhas;
 }
 
+// true = o PDF avisa "Envio: incluso no valor total" (sem mostrar o valor). Padrão: não avisa nada.
+const AVISAR_ENVIO_INCLUSO = false;
+
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const id = params.id;
   const emp = await getEmpresa();
@@ -173,7 +176,10 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   }
 
   // ---------- Bloco VALOR TOTAL — faixa preta com barra magenta lateral ----------
-  const totalGeral = itens.reduce((s2, i) => s2 + i.valor_total, 0);
+  // Envio (Correios): soma no valor total do cliente, mas não aparece como linha no PDF
+  const totalItens = itens.reduce((s2, i) => s2 + i.valor_total, 0);
+  const valorEnvio = orc.envio ? Number(orc.valor_envio ?? 0) : 0;
+  const totalGeral = totalItens + valorEnvio;
   const totalBlocoH = mm(13);
   if (y - mm(9) - totalBlocoH < limiteY) y = novaPagina() + mm(9);
   y -= mm(9);
@@ -189,7 +195,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   let textoUrgencia = "Opcional: entrega em até 48h, consulte o acréscimo.";
   if (orc.urgencia_tipo === "percentual" && urgV > 0) {
     // % sobre o total fechado da proposta, já convertido em reais
-    const extra = Math.round(totalGeral * urgV) / 100;
+    const extra = Math.round(totalItens * urgV) / 100; // a taxa de urgência não incide sobre o envio
     textoUrgencia = `Opcional: entrega em até 48h mediante acréscimo de ${pctTxt(urgV)} sobre o valor (${brl(extra)}).`;
   } else {
     const fixo = urgV > 0 ? urgV : adicional;
@@ -200,6 +206,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   const cond: [string, string][] = [];
   if (orc.mostrar_prazo !== false) cond.push(["Prazo de produção", orc.prazo ?? "5 dias úteis após aprovação da arte"]);
   cond.push(["Forma de pagamento", orc.pagamento ?? "50% na aprovação e 50% na entrega | PIX"]);
+  if (AVISAR_ENVIO_INCLUSO && valorEnvio > 0) cond.push(["Envio", "Incluso no valor total."]);
   if (orc.mostrar_arte !== false) cond.push(["Arte final", "Enviar em alta resolução nos formatos PDF, AI ou CDR."]);
   if (orc.bonificacao) cond.push(["Bonificação", orc.bonificacao]);
   if (orc.producao_prioritaria) cond.push(["Produção prioritária", textoUrgencia]);
