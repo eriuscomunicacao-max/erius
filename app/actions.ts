@@ -154,6 +154,12 @@ export async function salvarConfig(fd: FormData) {
 }
 
 /* ---------- Orçamentos ---------- */
+// Envio (Correios): soma no total que o cliente paga; não aparece no PDF nem entra no faturamento
+function dadosEnvio(fd: FormData) {
+  const envio = fd.get("envio") === "sim";
+  return { envio, valor_envio: envio ? Math.max(0, valor(fd.get("valor_envio"))) : 0 };
+}
+
 export async function criarOrcamento(fd: FormData) {
   const s = db();
   const cliente = txt(fd.get("cliente")) ?? "Sem nome";
@@ -181,6 +187,7 @@ export async function criarOrcamento(fd: FormData) {
       urgencia_valor: fd.get("urgencia_valor") ? valor(fd.get("urgencia_valor")) : null,
       mostrar_prazo: fd.get("mostrar_prazo") === "on",
       mostrar_arte: fd.get("mostrar_arte") === "on",
+      ...dadosEnvio(fd),
     })
     .select("id")
     .single();
@@ -215,7 +222,7 @@ export async function aprovarOrcamento(fd: FormData) {
   const { data: itens, error: e2 } = await s.from("orcamento_itens").select("*").eq("orcamento_id", id).order("ordem");
   if (e2) throw new Error(e2.message);
 
-  const pedidosNovos = (itens ?? []).map((it) => ({
+  const pedidosNovos = (itens ?? []).map((it, i) => ({
     cliente: orc.cliente,
     servico: it.servico,
     descricao: it.descricao ?? (it.tamanho ? `${it.tamanho}` : null),
@@ -226,6 +233,7 @@ export async function aprovarOrcamento(fd: FormData) {
     adicional_prioridade: 0,
     forma_pagto: "Pix",
     observacoes: `Aprovado do orçamento #${id}`,
+    valor_envio: i === 0 && orc.envio ? Number(orc.valor_envio) || 0 : 0, // o envio fica no 1º pedido
   }));
   if (pedidosNovos.length) await run(s.from("pedidos").insert(pedidosNovos));
   await run(s.from("orcamentos").update({ status: "aprovado" }).eq("id", id));
@@ -248,7 +256,7 @@ type ItemOS = { servico: string; descricao: string; quantidade: number; valor_un
 
 type DadosOS = {
   cliente: string; telefone: string | null; data: string; prazo_entrega: string | null;
-  forma: string; observacoes: string | null; pago: number; orcamento_id?: string | null; itens: ItemOS[];
+  forma: string; observacoes: string | null; pago: number; orcamento_id?: string | null; valor_envio?: number; itens: ItemOS[];
 };
 
 // Cria a OS + o pedido em Clientes + o pagamento de entrada. Usado pela aba OS e pelo orçamento aprovado.
@@ -277,6 +285,7 @@ async function gravarOS(d: DadosOS) {
       data: d.data,
       prioridade: false,
       valor_base: total,
+      valor_envio: d.valor_envio ?? 0, // repassado ao cliente; não entra no faturamento
       adicional_prioridade: 0,
       forma_pagto: d.forma,
       observacoes: d.orcamento_id ? "Gerado a partir de orçamento aprovado" : d.observacoes,
@@ -352,6 +361,7 @@ export async function aprovarOrcamentoEmOS(fd: FormData) {
     observacoes: orc.observacoes ?? null,
     pago: valor(fd.get("valor_pago")),
     orcamento_id: id,
+    valor_envio: orc.envio ? Number(orc.valor_envio) || 0 : 0,
     itens,
   });
   await run(s.from("orcamentos").update({ status: "aprovado" }).eq("id", id));
@@ -496,6 +506,7 @@ export async function atualizarOrcamento(fd: FormData) {
       urgencia_valor: fd.get("urgencia_valor") ? valor(fd.get("urgencia_valor")) : null,
       mostrar_prazo: fd.get("mostrar_prazo") === "on",
       mostrar_arte: fd.get("mostrar_arte") === "on",
+      ...dadosEnvio(fd),
     }).eq("id", id)
   );
   // troca os itens: grava os novos antes de apagar os antigos (não perde nada se der erro)
