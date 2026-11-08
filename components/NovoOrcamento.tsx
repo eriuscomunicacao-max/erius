@@ -77,6 +77,21 @@ const itemDoProduto = (p: Produto): Item => ({
   qtdTxt: p.unidade === "milheiro" ? "1000" : "1", precoTxt: txtBR(p.preco), largTxt: "", altTxt: "",
 });
 
+// Sem a tabela de preços: monta a grade a partir dos produtos de etiqueta cadastrados
+// (preço por unidade; aceita também os cadastrados "por cento"). Dá preço linear por quantidade.
+function gradeDosProdutos(produtos: Produto[]): PrecoTabela[] {
+  const out: PrecoTabela[] = [];
+  for (const p of produtos) {
+    if (String(p.categoria) !== "Etiquetas") continue;
+    const un = String(p.unidade);
+    const porUn = un === "un" ? Number(p.preco) : /cento/i.test(un) ? Number(p.preco) / 100 : null;
+    const m = lerMedida(String(p.nome));
+    if (porUn == null || !m || !(porUn > 0)) continue;
+    for (const q of [100, 1000]) out.push({ tamanho: m.texto, quantidade: q, preco: porUn * q });
+  }
+  return out;
+}
+
 const qtdDe = (it: Item) => Math.max(0, parseBR(it.qtdTxt));
 const totalDe = (it: Item) =>
   it.etq ? r2(parseBR(it.totalTxt ?? "")) :
@@ -141,6 +156,9 @@ export default function NovoOrcamento({ produtos, padroes, inicial, precos = [] 
   const [erro, setErro] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
 
+  // tabela de preços (se a página enviar) ou, senão, os produtos de etiqueta do catálogo
+  const grade = precos.length ? precos : gradeDosProdutos(produtos);
+
   const mudar = (i: number, patch: Partial<Item>) =>
     setItens((v) =>
       v.map((it, idx) => {
@@ -152,7 +170,7 @@ export default function NovoOrcamento({ produtos, padroes, inicial, precos = [] 
           else {
             if ("medSel" in patch || "medOutra" in patch) novo.totalManual = false;
             if (!novo.totalManual && ("medSel" in patch || "medOutra" in patch || "qtdTxt" in patch)) {
-              const sug = precoSugerido(precos, medidaDe(novo), qtdDe(novo));
+              const sug = precoSugerido(grade, medidaDe(novo), qtdDe(novo));
               novo.totalTxt = sug ? txtBR(r2(sug)) : "";
             }
           }
@@ -395,7 +413,7 @@ export default function NovoOrcamento({ produtos, padroes, inicial, precos = [] 
                   <label className="rotulo">Medida</label>
                   <select className="campo" value={it.medSel ?? ""} onChange={(e) => mudar(i, { medSel: e.target.value })}>
                     <option value="">Escolha...</option>
-                    {[...new Set(precos.map((p) => p.tamanho))].sort((a, b) => parseFloat(a) - parseFloat(b)).map((t) => <option key={t} value={t}>{t} cm</option>)}
+                    {[...new Set(grade.map((p) => p.tamanho))].sort((a, b) => parseFloat(a) - parseFloat(b)).map((t) => <option key={t} value={t}>{t} cm</option>)}
                     <option value="outra">Outra medida...</option>
                   </select>
                   {it.medSel === "outra" && (
