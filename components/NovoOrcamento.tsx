@@ -6,6 +6,7 @@ import { totalItem, rotuloUnidade, type Produto } from "@/lib/produtos";
 import { SERVICOS } from "@/lib/constants";
 import { Valor } from "@/components/Privacidade";
 import { parseMedidas, fmtM2 } from "@/lib/medidas";
+import { precoSugerido, lerMedida, type PrecoTabela } from "@/lib/etiquetaPreco";
 
 const brl = (v: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0);
 const parseBR = (s: string) => {
@@ -33,6 +34,11 @@ type Item = {
   fixo?: number;          // total original (ao editar) até mexer em qtd/preço
   lote?: boolean;         // modo "metragem total": lista de medidas somada, preço por m²
   medidasTxt?: string;    // uma medida por linha (ex: 0,45x0,80 x2)
+  etq?: boolean;          // etiqueta por medida (tabela ou medida livre)
+  medSel?: string;        // "2x2"... ou "outra"
+  medOutra?: string;      // medida digitada (ex: 4x1)
+  totalTxt?: string;      // valor total do item (sugerido pela tabela, editável)
+  totalManual?: boolean;  // true depois que o usuário edita o total
 };
 
 type Padroes = { prazo: string; pagamento: string; validade: number; adicional: number };
@@ -65,6 +71,7 @@ const itemAvulso = (): Item => ({
   qtdTxt: "1", precoTxt: "", largTxt: "", altTxt: "",
 });
 const itemLote = (): Item => ({ ...itemAvulso(), unidade: "m²", lote: true, medidasTxt: "" });
+const itemEtq = (): Item => ({ ...itemAvulso(), servico: "Etiquetas", etq: true, medSel: "", medOutra: "", totalTxt: "", qtdTxt: "100" });
 const itemDoProduto = (p: Produto): Item => ({
   produto_id: p.id, servico: p.categoria, unidade: p.unidade, descricao: "", nomeProduto: p.nome, tamanho: null,
   qtdTxt: p.unidade === "milheiro" ? "1000" : "1", precoTxt: txtBR(p.preco), largTxt: "", altTxt: "",
@@ -72,14 +79,18 @@ const itemDoProduto = (p: Produto): Item => ({
 
 const qtdDe = (it: Item) => Math.max(0, parseBR(it.qtdTxt));
 const totalDe = (it: Item) =>
+  it.etq ? r2(parseBR(it.totalTxt ?? "")) :
   it.fixo ??
   (it.lote
     ? r2(parseMedidas(it.medidasTxt ?? "").areaTotal * parseBR(it.precoTxt))
     : totalItem(it.unidade, parseBR(it.precoTxt), qtdDe(it), parseBR(it.largTxt), parseBR(it.altTxt)));
+const medidaDe = (it: Item) =>
+  it.medSel === "outra" ? (lerMedida(it.medOutra ?? "")?.texto ?? "") : it.medSel ?? "";
 const nomeDe = (it: Item) =>
+  it.etq ? ["Etiqueta", medidaDe(it), it.descricao.trim()].filter(Boolean).join(" ") :
   it.produto_id ? [it.nomeProduto, it.descricao.trim()].filter(Boolean).join(" · ") : it.descricao.trim();
 
-export default function NovoOrcamento({ produtos, padroes, inicial }: { produtos: Produto[]; padroes: Padroes; inicial?: Inicial }) {
+export default function NovoOrcamento({ produtos, padroes, inicial, precos = [] }: { produtos: Produto[]; padroes: Padroes; inicial?: Inicial; precos?: PrecoTabela[] }) {
   const router = useRouter();
   const editando = !!inicial;
   const [cliente, setCliente] = useState(inicial?.cliente ?? "");
@@ -136,6 +147,16 @@ export default function NovoOrcamento({ produtos, padroes, inicial }: { produtos
         if (idx !== i) return it;
         const novo = { ...it, ...patch };
         if ("qtdTxt" in patch || "precoTxt" in patch || "largTxt" in patch || "altTxt" in patch || "medidasTxt" in patch) delete novo.fixo;
+        if (novo.etq) {
+          if ("totalTxt" in patch) novo.totalManual = true;
+          else {
+            if ("medSel" in patch || "medOutra" in patch) novo.totalManual = false;
+            if (!novo.totalManual && ("medSel" in patch || "medOutra" in patch || "qtdTxt" in patch)) {
+              const sug = precoSugerido(precos, medidaDe(novo), qtdDe(novo));
+              novo.totalTxt = sug ? txtBR(r2(sug)) : "";
+            }
+          }
+        }
         return novo;
       })
     );
@@ -170,6 +191,12 @@ export default function NovoOrcamento({ produtos, padroes, inicial }: { produtos
         if (m.invalidas.length) return setErro(`Não entendi estas medidas: ${m.invalidas.slice(0, 3).join(" | ")}`);
         continue;
       }
+      if (it.etq) {
+        if (!medidaDe(it)) return setErro("Escolha a medida da etiqueta (ou digite em Outra medida, ex: 4x1).");
+        if (!qtdDe(it)) return setErro("Informe a quantidade de todos os itens.");
+        if (!(totalDe(it) > 0)) return setErro("Informe o valor total da etiqueta.");
+        continue;
+      }
       if (!qtdDe(it)) return setErro("Informe a quantidade de todos os itens.");
       if (it.unidade === "m²" && (!parseBR(it.largTxt) || !parseBR(it.altTxt))) return setErro("Informe largura e altura (em metros) dos itens cobrados por m².");
     }
@@ -196,7 +223,7 @@ export default function NovoOrcamento({ produtos, padroes, inicial }: { produtos
       return {
         tipo: "manual" as const,
         servico: it.servico,
-        tamanho: it.unidade === "m²" ? `${it.largTxt} x ${it.altTxt} m` : it.tamanho,
+        tamanho: it.etq ? medidaDe(it) : it.unidade === "m²" ? `${it.largTxt} x ${it.altTxt} m` : it.tamanho,
         quantidade: Math.max(1, Math.round(q)),
         descricao: nomeDe(it),
         valor_unitario: q ? r2(vt / q) : vt,
@@ -323,4 +350,196 @@ export default function NovoOrcamento({ produtos, padroes, inicial }: { produtos
                 </select>
               </div>
               <div>
-                <label className="rotulo" htmlFor="urgencia_valor">{urgTipo === "percentual" ? "Porcentagem (%)" :
+                <label className="rotulo" htmlFor="urgencia_valor">{urgTipo === "percentual" ? "Porcentagem (%)" : "Valor (R$)"}</label>
+                <input
+                  id="urgencia_valor" name="urgencia_valor" className="campo" inputMode="decimal" value={urgValorTxt}
+                  onChange={(e) => setUrgValorTxt(e.target.value)} placeholder={urgTipo === "percentual" ? "Ex: 30" : "0,00"}
+                />
+              </div>
+              {urgTipo === "percentual" && parseBR(urgValorTxt) > 0 && (
+                <div className="col-span-2 flex items-end pb-2 text-sm text-mute">
+                  <span>Acréscimo de <strong className="text-ink"><Valor>{brl(r2((total * parseBR(urgValorTxt)) / 100))}</Valor></strong> sobre <Valor>{brl(total)}</Valor></span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="col-span-2 md:col-span-2">
+          <label className="rotulo" htmlFor="bonificacao">Bonificação (opcional)</label>
+          <input id="bonificacao" name="bonificacao" defaultValue={inicial?.bonificacao ?? ""} className="campo" placeholder="Ex: brinde ou item extra, sem alteração no valor" />
+        </div>
+        <div className="col-span-2 md:col-span-4">
+          <label className="rotulo" htmlFor="observacoes">Observações (opcional)</label>
+          <input id="observacoes" name="observacoes" defaultValue={inicial?.observacoes ?? ""} className="campo" />
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-line">
+        <div className="flex items-center justify-between border-b border-line p-3">
+          <span className="text-sm font-semibold text-ink">Itens do orçamento</span>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setItens((v) => [...v, itemAvulso()])} className="botao2 py-1 text-xs">+ Adicionar item</button>
+            <button type="button" onClick={() => setItens((v) => [...v, itemLote()])} className="botao2 py-1 text-xs">+ Metragem total</button>
+            <button type="button" onClick={() => setItens((v) => [...v, itemEtq()])} className="botao2 py-1 text-xs">+ Etiqueta (medida)</button>
+          </div>
+        </div>
+        {itens.length === 0 ? (
+          <p className="p-4 text-sm text-mute">
+            Nenhum item ainda. Clique em &quot;Adicionar item&quot; e escolha um produto do seu catálogo{produtos.length === 0 && " (cadastre em Produtos e serviços)"} ou digite um item avulso.
+          </p>
+        ) : (
+          <ul className="divide-y divide-line">
+            {itens.map((it, i) => it.etq ? (
+              <li key={i} className="grid grid-cols-2 gap-2 p-3 md:grid-cols-12">
+                <div className="col-span-2 md:col-span-2">
+                  <label className="rotulo">Medida</label>
+                  <select className="campo" value={it.medSel ?? ""} onChange={(e) => mudar(i, { medSel: e.target.value })}>
+                    <option value="">Escolha...</option>
+                    {[...new Set(precos.map((p) => p.tamanho))].sort((a, b) => parseFloat(a) - parseFloat(b)).map((t) => <option key={t} value={t}>{t} cm</option>)}
+                    <option value="outra">Outra medida...</option>
+                  </select>
+                  {it.medSel === "outra" && (
+                    <input className="campo mt-1" value={it.medOutra ?? ""} onChange={(e) => mudar(i, { medOutra: e.target.value })} placeholder="Ex: 4x1" autoFocus />
+                  )}
+                  {it.medSel === "outra" && !!it.medOutra && !medidaDe(it) && <div className="mt-1 text-[11px] text-magenta">Use o formato 4x1</div>}
+                </div>
+                <div className="col-span-2 md:col-span-3">
+                  <label className="rotulo">Complemento (opcional)</label>
+                  <input className="campo" value={it.descricao} onChange={(e) => mudar(i, { descricao: e.target.value })} placeholder="Ex: fosco, redonda" />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="rotulo">Qtd</label>
+                  <input className="campo" inputMode="numeric" value={it.qtdTxt} onChange={(e) => mudar(i, { qtdTxt: e.target.value })} />
+                </div>
+                <div className="md:col-span-3">
+                  <label className="rotulo">Valor total (R$)</label>
+                  <input className="campo" inputMode="decimal" value={it.totalTxt ?? ""} onChange={(e) => mudar(i, { totalTxt: e.target.value })} placeholder="0,00" />
+                  <div className="mt-1 text-[11px] text-mute">{it.medSel === "outra" ? "Estimado pela área; pode ajustar" : "Pela tabela; pode ajustar"}</div>
+                </div>
+                <div className="col-span-2 flex items-end justify-between gap-2 md:col-span-2">
+                  <span className="pb-2 font-display font-semibold text-ciano"><Valor>{brl(totalDe(it))}</Valor></span>
+                  <button type="button" onClick={() => setItens((v) => v.filter((_, idx) => idx !== i))} className="rounded p-1.5 text-mute hover:bg-magenta/15 hover:text-magenta" aria-label="Remover item">
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" /></svg>
+                  </button>
+                </div>
+              </li>
+            ) : it.lote ? (
+              <li key={i} className="grid grid-cols-2 gap-2 p-3 md:grid-cols-12">
+                <div className="col-span-2 md:col-span-4">
+                  <label className="rotulo">Produto / serviço (por m²)</label>
+                  <select className="campo" value={it.produto_id ?? ""} onChange={(e) => escolherProduto(i, e.target.value)}>
+                    <option value="">Item avulso (digitar)</option>
+                    {produtos.filter((p) => p.unidade === "m²").map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                  </select>
+                  <div className="mt-1 text-[11px] text-mute">Metragem total · o PDF mostra uma linha só</div>
+                </div>
+                <div className="col-span-2 md:col-span-4">
+                  <label className="rotulo">{it.produto_id ? "Complemento (opcional)" : "Descrição do item"}</label>
+                  <input className="campo" value={it.descricao} onChange={(e) => mudar(i, { descricao: e.target.value })} placeholder={it.produto_id ? "Ex: fosco" : "Ex: Impressão digital · adesivo fosco"} />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="rotulo">Preço (m²) (R$)</label>
+                  <input className="campo" inputMode="decimal" value={it.precoTxt} onChange={(e) => mudar(i, { precoTxt: e.target.value })} placeholder="0,00" />
+                </div>
+                <div className="col-span-2 flex items-end justify-between gap-2 md:col-span-2">
+                  <span className="pb-2 font-display font-semibold text-ciano"><Valor>{brl(totalDe(it))}</Valor></span>
+                  <button type="button" onClick={() => setItens((v) => v.filter((_, idx) => idx !== i))} className="rounded p-1.5 text-mute hover:bg-magenta/15 hover:text-magenta" aria-label="Remover item">
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" /></svg>
+                  </button>
+                </div>
+                <div className="col-span-2 md:col-span-12">
+                  <label className="rotulo">Medidas em metros, uma por linha (use &quot;x2&quot; no fim para repetir; &quot;cm&quot; converte)</label>
+                  <textarea
+                    className="campo font-mono text-sm"
+                    rows={6}
+                    value={it.medidasTxt ?? ""}
+                    onChange={(e) => mudar(i, { medidasTxt: e.target.value })}
+                    placeholder={"0,45 x 0,80\n0,50 x 0,60 x2\n0,30 x 0,30 x10"}
+                  />
+                  {(() => {
+                    const m = parseMedidas(it.medidasTxt ?? "");
+                    return (
+                      <div className="mt-1 text-xs text-mute">
+                        {m.linhas} {m.linhas === 1 ? "medida" : "medidas"} · {m.pecas} {m.pecas === 1 ? "peça" : "peças"} · <strong className="text-ink">{fmtM2(m.areaTotal)} m²</strong> no total
+                        {m.invalidas.length > 0 && <span className="text-magenta"> · não entendi: {m.invalidas.slice(0, 3).join(" | ")}</span>}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </li>
+            ) : (
+              <li key={i} className="grid grid-cols-2 gap-2 p-3 md:grid-cols-12">
+                <div className="col-span-2 md:col-span-4">
+                  <label className="rotulo">Produto / serviço</label>
+                  <select className="campo" value={it.produto_id ?? ""} onChange={(e) => escolherProduto(i, e.target.value)}>
+                    <option value="">Item avulso (digitar)</option>
+                    {produtos.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                  </select>
+                  {it.produto_id && <div className="mt-1 text-[11px] text-mute">Cobrado {rotuloUnidade(it.unidade)}</div>}
+                </div>
+                <div className="col-span-2 md:col-span-3">
+                  <label className="rotulo">{it.produto_id ? "Complemento (opcional)" : "Descrição do item"}</label>
+                  <input className="campo" value={it.descricao} onChange={(e) => mudar(i, { descricao: e.target.value })} placeholder={it.produto_id ? "Ex: fosco, 4x4 cores" : "O que é o item"} />
+                </div>
+                {it.unidade === "m²" && (
+                  <>
+                    <div className="md:col-span-1">
+                      <label className="rotulo">Larg. (m)</label>
+                      <input className="campo" inputMode="decimal" value={it.largTxt} onChange={(e) => mudar(i, { largTxt: e.target.value })} placeholder="1,00" />
+                    </div>
+                    <div className="md:col-span-1">
+                      <label className="rotulo">Alt. (m)</label>
+                      <input className="campo" inputMode="decimal" value={it.altTxt} onChange={(e) => mudar(i, { altTxt: e.target.value })} placeholder="2,00" />
+                    </div>
+                  </>
+                )}
+                <div className="md:col-span-1">
+                  <label className="rotulo">Qtd</label>
+                  <input className="campo" inputMode="decimal" value={it.qtdTxt} onChange={(e) => mudar(i, { qtdTxt: e.target.value })} />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="rotulo">Preço {it.unidade !== "un" ? `(${it.unidade})` : ""} (R$)</label>
+                  <input className="campo" inputMode="decimal" value={it.precoTxt} onChange={(e) => mudar(i, { precoTxt: e.target.value })} placeholder="0,00" />
+                </div>
+                <div className="col-span-2 flex items-end justify-between gap-2 md:col-span-1">
+                  <span className="pb-2 font-display font-semibold text-ciano"><Valor>{brl(totalDe(it))}</Valor></span>
+                  <button type="button" onClick={() => setItens((v) => v.filter((_, idx) => idx !== i))} className="rounded p-1.5 text-mute hover:bg-magenta/15 hover:text-magenta" aria-label="Remover item">
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" /></svg>
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        {itens.length > 0 && (
+          <div className="space-y-1 border-t border-line p-3">
+            {valorEnvio > 0 && (
+              <>
+                <div className="flex items-center justify-between text-sm text-mute">
+                  <span>Itens</span>
+                  <span><Valor>{brl(total)}</Valor></span>
+                </div>
+                <div className="flex items-center justify-between text-sm text-mute">
+                  <span>Envio (não aparece no PDF)</span>
+                  <span><Valor>{brl(valorEnvio)}</Valor></span>
+                </div>
+              </>
+            )}
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-mute">Total do orçamento</span>
+              <span className="font-display text-lg font-bold text-ink"><Valor>{brl(totalGeral)}</Valor></span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {erro && <p className="text-sm text-magenta" role="alert">{erro}</p>}
+      <div className="flex gap-2">
+        <button type="submit" disabled={salvando} className="botao disabled:opacity-60">
+          {salvando ? "Salvando..." : editando ? "Salvar alterações" : "Salvar orçamento"}
+        </button>
+        {editando && <a href="/orcamentos" className="botao2">Cancelar</a>}
+      </div>
+    </form>
+  );
+}
